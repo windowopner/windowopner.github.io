@@ -16,6 +16,8 @@ Plain HTML, CSS, and JavaScript with no build step.
 
 To add or swap a project, edit `DISCS` in `app.js` and the matching icon builder in `icons.js` (same order).
 
+When you change `style.css` or any `.js` file, bump the `?v=` number on its tag in `index.html`. GitHub Pages lets browsers cache files for 10 minutes, and without the bump a visitor can get the new page with the old styles.
+
 Preview locally:
 
 ```bash
