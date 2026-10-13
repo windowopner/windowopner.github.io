@@ -605,6 +605,46 @@ select(0);
 applyTheme(savedTheme);
 if (hasIcons) Icons.start({ reducedMotion });
 
+// Quality fader: pixel art on the left, the original look at 40, cinema on the right.
+// Cheap visual changes (letterbox, grade, bloom) follow the fader live; re-rendering
+// work waits for the fader to settle, and disc labels are redrawn on release.
+const fader = $("quality");
+let qualityTimer = 0;
+function qualityName(q) {
+  return q < 0.25 ? "pixel" : q > 0.7 ? "cinema" : "film";
+}
+function applyQuality(q, { heavy = true, labels = false } = {}) {
+  const root = document.documentElement;
+  const cine = Math.max(0, (q - 0.6) / 0.4);
+  root.style.setProperty("--q", q.toFixed(3));
+  root.style.setProperty("--cine", cine.toFixed(3));
+  root.dataset.quality = qualityName(q);
+  fader.style.setProperty("--fill", `${(q * 100).toFixed(1)}%`);
+  fader.setAttribute("aria-valuetext", `${Math.round(q * 100)}, ${qualityName(q)}`);
+  if (!heavy) return;
+  clearTimeout(qualityTimer);
+  qualityTimer = setTimeout(() => {
+    if (hasIcons) Icons.setQuality(q);
+    if (window.Orbit) Orbit.setQuality(q);
+    if (window.Film) Film.setQuality(q);
+    if (labels && hasIcons) Icons.thumbs().forEach((src, i) => { discButtons[i].querySelector("img").src = src; });
+  }, 90);
+}
+fader.addEventListener("input", () => applyQuality(fader.value / 100));
+fader.addEventListener("change", () => {
+  const q = fader.value / 100;
+  applyQuality(q, { labels: true });
+  try { localStorage.setItem("quality", String(fader.value)); } catch (err) { /* storage blocked */ }
+});
+fader.addEventListener("keydown", (e) => e.stopPropagation()); // arrows move the fader, not the discs
+{
+  let saved = new URLSearchParams(location.search).get("quality");
+  if (saved === null) { try { saved = localStorage.getItem("quality"); } catch (err) { saved = null; } }
+  const v = Math.max(0, Math.min(100, Number(saved ?? 40)));
+  fader.value = Number.isFinite(v) ? v : 40;
+  applyQuality(fader.value / 100, { labels: true });
+}
+
 // Power-on intro, first visit only: lights come up, the display says hello,
 // discs load one by one, and the clamp sets down on disc 1. Any key or click skips it.
 (function boot() {

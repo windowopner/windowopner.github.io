@@ -4,8 +4,11 @@
   const canvas = document.getElementById("film");
   const ctx = canvas.getContext("2d");
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const SCALE = 3;
+  let SCALE = 3;
   const FPS = 18;
+  let cine = 0;        // 0..1 toward the cinematic look: finer grain, fewer scratches, gate weave
+  let grainLight = 1;  // grain strength
+  const room = document.querySelector(".room");
 
   let w = 0;
   let h = 0;
@@ -26,7 +29,7 @@
         d[i] = light ? 255 : 20;
         d[i + 1] = light ? 236 : 10;
         d[i + 2] = light ? 205 : 4;
-        d[i + 3] = (light ? 10 : 14) + Math.random() * (light ? 12 : 16);
+        d[i + 3] = ((light ? 10 : 14) + Math.random() * (light ? 12 : 16)) * grainLight;
       }
       grain.push(img);
     }
@@ -44,6 +47,17 @@
 
   window.addEventListener("resize", resize, { passive: true });
   resize();
+  window.Film = {
+    // 0 = chunky grain, 0.4 = the original look, 1 = fine cinema grain with gate weave.
+    setQuality(q) {
+      SCALE = q <= 0.4 ? Math.round(5 - 2 * (q / 0.4)) : Math.max(1.5, 3 - 1.5 * ((q - 0.4) / 0.6));
+      cine = Math.max(0, (q - 0.6) / 0.4);
+      grainLight = q <= 0.4 ? 1.25 - 0.25 * (q / 0.4) : 1 - 0.35 * ((q - 0.4) / 0.6);
+      if (cine === 0) room.style.transform = "";
+      resize();
+    },
+  };
+
   if (reduced) return;
 
   const scratches = [];
@@ -66,8 +80,13 @@
     ctx.fillStyle = `rgba(255, 214, 160, ${flicker})`;
     ctx.fillRect(0, 0, w, h);
 
-    // Scratches: rare, thin, jittering vertical lines.
-    if (Math.random() < 0.035) {
+    // Gate weave: the whole frame drifts a fraction of a pixel, like film in a projector.
+    if (cine > 0) {
+      room.style.transform = `translate3d(${((Math.random() - 0.5) * 0.9 * cine).toFixed(2)}px, ${((Math.random() - 0.5) * 0.7 * cine).toFixed(2)}px, 0)`;
+    }
+
+    // Scratches: rare, thin, jittering vertical lines (rarer on the cinematic end).
+    if (Math.random() < 0.035 * (1 - cine * 0.75)) {
       scratches.push({ x: Math.random() * w, life: 4 + Math.random() * 14, light: Math.random() < 0.7, y0: Math.random() < 0.5 ? 0 : Math.random() * h * 0.5 });
     }
     for (let i = scratches.length - 1; i >= 0; i--) {
@@ -97,4 +116,5 @@
   }
 
   requestAnimationFrame(tick);
+
 })();

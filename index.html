@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Silkscreen&family=Geist:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-  <link rel="stylesheet" href="style.css?v=202610132225">
+  <link rel="stylesheet" href="style.css?v=202610132238">
 </head>
 <body>
   <canvas class="sky" id="sky" aria-hidden="true"></canvas>
@@ -115,6 +115,12 @@
 
     <footer class="bottom">
       <p>RAS G9. <span class="hint-desk">Scroll, use the arrow keys, or press 1 to 6 to change disc.</span><span class="hint-touch">Swipe the discs or tap one to change.</span></p>
+      <div class="quality">
+        <label class="q-label" for="quality">Quality</label>
+        <span class="q-end" aria-hidden="true">Pixel</span>
+        <input class="fader" id="quality" type="range" min="0" max="100" step="1" value="40">
+        <span class="q-end" aria-hidden="true">Cinema</span>
+      </div>
     </footer>
   </div>
 
@@ -142,7 +148,9 @@
     </div>
   </dialog>
 
+  <div class="grade" aria-hidden="true"></div>
   <div class="vignette" aria-hidden="true"></div>
+  <div class="letterbox" aria-hidden="true"><span></span><span></span></div>
   <canvas class="film" id="film" aria-hidden="true"></canvas>
   <span class="stamp" id="stamp" aria-hidden="true"></span>
 
@@ -158,9 +166,9 @@
   </noscript>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
-  <script src="icons.js?v=202610132225" defer></script>
-  <script src="film.js?v=202610132225" defer></script>
-  <script src="orbit.js?v=202610132225" defer></script>
-  <script src="app.js?v=202610132225" defer></script>
+  <script src="icons.js?v=202610132238" defer></script>
+  <script src="film.js?v=202610132238" defer></script>
+  <script src="orbit.js?v=202610132238" defer></script>
+  <script src="app.js?v=202610132238" defer></script>
 </body>
 </html>

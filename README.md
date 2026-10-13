@@ -16,6 +16,8 @@ Plain HTML, CSS, and JavaScript with no build step.
 - `favicon.svg`, `apple-touch-icon.png`, `og.png`: icon and link preview.
 - `style.css`: the room, the player, and the console.
 
+The Quality fader in the footer runs from pixel art (0) through the original look (40) to cinema (100): render resolution, frame rate, shading, grain, depth of field, letterbox, and colour grade all follow it. Link a setting with `?quality=0` to `?quality=100`.
+
 First visit plays a short power-on intro (add `?intro` to see it again, `?nointro` to skip). The Notes button opens the liner notes booklet (link straight to it with `#notes`).
 
 **Locked discs.** Every disc except Undertone ships as filler text drawn as a mosaic. Their real title, description, and link live only in `private/discs.json` on this computer. To set or change the keypad code (4 to 12 digits), run `node tools/lock.mjs` and commit the new `locks.json`. The page decrypts it in the browser when someone enters the code; a short numeric code can still be brute-forced offline, so use 8 or more digits.

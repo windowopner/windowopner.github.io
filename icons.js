@@ -1,22 +1,29 @@
 // Pixel 3D icons: low-res render, toon shading, inverted-hull outlines, stepped animation.
 // Each icon is a THREE.Group with an update(t) method.
+// setQuality(q) slides between chunky stop-motion pixels (q = 0) and a smooth,
+// high-resolution, softly shaded render (q = 1).
 window.Icons = (() => {
-  const RES = 100;      // stage render size before upscaling
-  const THUMB = 56;     // disc label render size
-  const FPS = 15;       // stepped like stop motion
+  let RES = 100;      // stage render size before upscaling
+  let THUMB = 56;     // disc label render size
+  let FPS = 15;       // stepped like stop motion
 
   const PAL = {
     ink: 0x1d1410, cream: 0xefe2cc, amber: 0xf2a541, terracotta: 0xc8553d, olive: 0x7d8b4a,
     blue: 0x5b84a6, teal: 0x3f7f86, silver: 0xcdc8c0, gold: 0xd9a943, dark: 0x3a302a, green: 0x2f5d50,
   };
 
-  let renderer, scene, camera, gradient, outlineMat;
+  let renderer, scene, camera, gradient, smoothGradient, outlineMat;
   const icons = [];
+  const toons = [];
+  const hulls = [];
+  let cinematic = false;
   let current = null;
   let switchedAt = 0;
 
   function toon(color, extra = {}) {
-    return new THREE.MeshToonMaterial({ color, gradientMap: gradient, ...extra });
+    const m = new THREE.MeshToonMaterial({ color, gradientMap: cinematic ? smoothGradient : gradient, ...extra });
+    toons.push(m);
+    return m;
   }
 
   // A mesh plus a slightly larger back-face copy, which reads as a 1px ink outline once pixelated.
@@ -28,6 +35,7 @@ window.Icons = (() => {
       const o = new THREE.Mesh(geo, outlineMat);
       o.scale.setScalar(outline);
       g.add(o);
+      hulls.push(o);
     }
     g.userData.mesh = m;
     return g;
@@ -259,6 +267,12 @@ window.Icons = (() => {
     gradient.magFilter = THREE.NearestFilter;
     gradient.generateMipmaps = false;
     gradient.needsUpdate = true;
+    // Two-texel ramp with linear filtering: toon shading turns into a soft falloff.
+    smoothGradient = new THREE.DataTexture(new Uint8Array([40, 40, 40, 255, 255, 255, 255, 255]), 2, 1, THREE.RGBAFormat);
+    smoothGradient.minFilter = THREE.LinearFilter;
+    smoothGradient.magFilter = THREE.LinearFilter;
+    smoothGradient.generateMipmaps = false;
+    smoothGradient.needsUpdate = true;
     outlineMat = new THREE.MeshBasicMaterial({ color: PAL.ink, side: THREE.BackSide });
 
     scene = new THREE.Scene();
@@ -277,6 +291,7 @@ window.Icons = (() => {
 
   // Render every icon once at thumbnail size for the disc labels.
   function thumbs() {
+    if (!renderer) return [];
     renderer.setSize(THUMB, THUMB, false);
     const urls = icons.map((icon) => {
       scene.add(icon);
@@ -321,5 +336,32 @@ window.Icons = (() => {
     requestAnimationFrame(loop);
   }
 
-  return { init, thumbs, show, start, count: () => icons.length };
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  // 0 = pixel art, 0.4 = the original look, 1 = cinematic.
+  function setQuality(q) {
+    if (!renderer) return;
+    if (q <= 0.4) {
+      const t = q / 0.4;
+      RES = Math.round(lerp(32, 100, t));
+      THUMB = Math.round(lerp(24, 56, t));
+      FPS = lerp(8, 15, t);
+    } else {
+      const t = (q - 0.4) / 0.6;
+      RES = Math.round(lerp(100, 480, Math.pow(t, 1.4)));
+      THUMB = Math.round(lerp(56, 176, t));
+      FPS = lerp(15, 60, t);
+    }
+    const smooth = q >= 0.7;
+    if (smooth !== cinematic) {
+      cinematic = smooth;
+      toons.forEach((m) => { m.gradientMap = smooth ? smoothGradient : gradient; m.needsUpdate = true; });
+      hulls.forEach((h) => { h.visible = !smooth; });
+    }
+    renderer.setSize(RES, RES, false);
+    last = 0;
+    if (current) renderer.render(scene, camera);
+  }
+
+  return { init, thumbs, show, start, setQuality, count: () => icons.length };
 })();

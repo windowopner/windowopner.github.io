@@ -18,7 +18,8 @@ window.Orbit = (() => {
   const RING_R = 0.86;    // of viewport width
   const RING_FLAT = 0.14; // ring height as a share of its width
   const RING_TILT = (-4 * Math.PI) / 180;
-  const SCALE = 3;
+  let SCALE = 3;       // canvas pixels are SCALE css pixels wide; set by quality
+  let smooth = 0;      // 0..1, how far toward the cinematic look (no dithering, depth of field)
   const PLANET_MS = 1000 / 12; // the planet turns slowly, so it redraws less often
   const SKY_MS = 1000 / 15;
 
@@ -125,7 +126,7 @@ window.Orbit = (() => {
     CY = bandTop + H * PLANET_Y;
     PR = Math.min(H * PLANET_R, BW * 0.32);
     R = BW * RING_R;
-    RY = R * RING_FLAT;
+    RY = Math.min(R * RING_FLAT, H * 0.34); // flatten further when the stage is short
     [back, front].forEach((c) => {
       c.width = Math.max(1, Math.ceil(BW / SCALE));
       c.height = Math.max(1, Math.ceil(BH / SCALE));
@@ -182,6 +183,9 @@ window.Orbit = (() => {
       // Back half goes under the planet canvas (z 5), front half over it.
       li.style.zIndex = sn < 0 ? String(1 + Math.round(depth * 3)) : String(6 + Math.round(depth * 10));
       li.style.setProperty("--shade", (0.6 * (1 - depth)).toFixed(3));
+      // Cinematic depth of field: discs at the back go soft.
+      const blur = smooth > 0 ? (1 - depth) * 3.2 * smooth : 0;
+      li.style.filter = blur > 0.15 ? `blur(${blur.toFixed(2)}px)` : "";
     });
   }
 
@@ -204,9 +208,16 @@ window.Orbit = (() => {
         const b = Math.sin(ny * 10 + Math.sin(lon * 3 + ny * 4) * 0.7);
         const band = b < -0.6 ? 0 : b < -0.1 ? 1 : b < 0.35 ? 2 : b < 0.75 ? 1 : 3;
         const lit = Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
-        const v = lit + BAYER[((py + pr) & 3) * 4 + ((px + pr) & 3)] * 0.22;
-        let col = v < 0.12 ? NIGHT : BANDS[band];
-        let f = v < 0.12 ? 1 : v < 0.42 ? 0.5 : v < 0.7 ? 0.78 : 1;
+        let col, f;
+        if (smooth > 0.5) {
+          // Cinematic: continuous falloff into the night side, no dither.
+          col = BANDS[band];
+          f = Math.min(1, 0.06 + lit * 1.05);
+        } else {
+          const v = lit + BAYER[((py + pr) & 3) * 4 + ((px + pr) & 3)] * 0.22;
+          col = v < 0.12 ? NIGHT : BANDS[band];
+          f = v < 0.12 ? 1 : v < 0.42 ? 0.5 : v < 0.7 ? 0.78 : 1;
+        }
         // Thin atmosphere: a bright rim along the lit edge.
         if (rr > rimIn && lit > 0.18) { col = RIM; f = 0.55 + lit * 0.45; }
         const o = ((py + pr) * size + (px + pr)) * 4;
@@ -219,6 +230,7 @@ window.Orbit = (() => {
     pctx.putImageData(img, 0, 0);
   }
 
+  let dustSize = 1;
   function drawDust(a, t) {
     const spin = reduced ? 0 : t * 0.00004;
     dust.forEach((p) => {
@@ -228,7 +240,8 @@ window.Orbit = (() => {
       const [bx, by] = ringPoint(phi, p.rad);
       ctx.globalAlpha = p.alpha * (0.55 + 0.45 * (sn + 1) / 2);
       ctx.fillStyle = `rgb(${p.c})`;
-      ctx.fillRect(Math.floor(bx / SCALE), Math.floor(by / SCALE), p.size, p.size);
+      const size = p.size * dustSize;
+      ctx.fillRect(Math.floor(bx / SCALE), Math.floor(by / SCALE), size, size);
     });
     bctx.globalAlpha = 1;
     fctx.globalAlpha = 1;
@@ -240,7 +253,7 @@ window.Orbit = (() => {
     stars.forEach((s) => {
       const a = s.twinkle && !reduced ? s.b * (0.45 + 0.55 * Math.sin(t * 0.003 + s.phase)) : s.b;
       sctx.fillStyle = s.warm ? `rgba(255, 214, 170, ${a.toFixed(2)})` : `rgba(235, 240, 255, ${a.toFixed(2)})`;
-      sctx.fillRect(s.x, s.y, 1, 1);
+      sctx.fillRect(s.x, s.y, dustSize, dustSize);
     });
     // Now and then a shooting star crosses the top of the sky.
     if (!reduced && !comet && Math.random() < 0.004) {
@@ -368,7 +381,7 @@ window.Orbit = (() => {
     if (!glass) return;
     running = false;
     cancelAnimationFrame(raf);
-    items.forEach((li) => { li.style.transform = ""; li.style.zIndex = ""; li.style.removeProperty("--shade"); });
+    items.forEach((li) => { li.style.transform = ""; li.style.zIndex = ""; li.style.filter = ""; li.style.removeProperty("--shade"); });
     glass.style.removeProperty("--par-x");
     glass.style.removeProperty("--par-y");
     [bctx, fctx, sctx].forEach((ctx) => ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height));
@@ -380,6 +393,14 @@ window.Orbit = (() => {
     focus: (i) => { if (running) focus(i); },
     // Throw the ring back by part of a turn so the spring sweeps it in (used by the intro).
     kick: (turns) => { if (running && !reduced) { ring -= TAU * turns; velocity = 0; } },
+    // 0 = chunky pixels, 0.4 = the original look, 1 = smooth and cinematic.
+    setQuality: (q) => {
+      const next = q <= 0.4 ? 6 - 3 * (q / 0.4) : 3 - 1.75 * ((q - 0.4) / 0.6);
+      SCALE = Math.round(next * 4) / 4;
+      smooth = Math.max(0, (q - 0.6) / 0.4);
+      dustSize = Math.max(1, Math.round(3 / SCALE));
+      if (running) { measure(); lastPlanet = -Infinity; lastSky = -Infinity; }
+    },
     onSelect: null,
   };
   return api;
