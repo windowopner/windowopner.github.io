@@ -2,14 +2,14 @@
 
 My portfolio, served by GitHub Pages at https://windowopner.github.io.
 
-Six projects loaded into a six-disc player. Scroll, use the arrow keys, press 1 to 6, or swipe to change disc. Each project has a small pixel 3D icon (Three.js r128, rendered at low resolution and scaled up), and a film grain layer sits on top of everything.
+Five projects loaded into a disc changer. Scroll, use the arrow keys, press a number key, or swipe to change disc. Each project has a small pixel 3D icon (Three.js r128, rendered at low resolution and scaled up), and a film grain layer sits on top of everything.
 
 Two themes, picked with the slide switch at the top: Room (the player on a shelf, with a clamp that lifts, travels, and sets down) and Space (the discs ride a planet's ring, which you can also grab and spin). The choice is remembered per browser.
 
 Plain HTML, CSS, and JavaScript with no build step.
 
 - `app.js`: the project list (`DISCS`), selection, display, and input.
-- `icons.js`: the six pixel 3D icons, one builder function each.
+- `icons.js`: the pixel 3D icons, one builder function each.
 - `film.js`: grain, dust, scratches, and flicker overlay.
 - `orbit.js`: the Space theme (pixel planet, ring of discs, stars).
 - `tools/lock.mjs`: encrypts `private/discs.json` (git-ignored) into `locks.json` with the keypad code.

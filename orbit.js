@@ -1,4 +1,4 @@
-// Space theme: the six discs ride a tilted ring around a pixel planet.
+// Space theme: the discs ride a tilted ring around a pixel planet.
 // The planet hangs off the left edge of the screen and the ring sweeps across it,
 // so only some discs are in frame at once. Selecting a disc turns the ring until
 // that disc reaches the front slot, low and just left of centre.
@@ -7,7 +7,7 @@
 // scaled up pixelated.
 window.Orbit = (() => {
   const TAU = Math.PI * 2;
-  const STEP = TAU / 6;
+  let STEP = TAU / 6; // set from the number of discs on first start
   const FRONT = (62 * Math.PI) / 180; // ring angle of the selected slot
   // Disc i sits at ring - i * STEP, so the next disc waits to the right of the front slot.
 
@@ -75,6 +75,7 @@ window.Orbit = (() => {
   function init() {
     glass = document.querySelector(".glass");
     items = [...document.querySelectorAll("#discs > li")];
+    STEP = TAU / items.length;
     back = document.getElementById("orbit-back");
     front = document.getElementById("orbit-front");
     sky = document.getElementById("sky");
@@ -360,7 +361,8 @@ window.Orbit = (() => {
     velocity = Math.max(-12, Math.min(12, drag.vel));
     const projected = ring + velocity * 0.22;
     const n = Math.round((projected - FRONT) / STEP);
-    const i = ((n % 6) + 6) % 6;
+    const count = items.length;
+    const i = ((n % count) + count) % count;
     target = FRONT + n * STEP;
     if (api.onSelect) api.onSelect(i);
   }

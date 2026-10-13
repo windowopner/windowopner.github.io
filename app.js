@@ -1,4 +1,4 @@
-// The player: six discs, one clamp, one display.
+// The player: a row of discs (however many are in DISCS), one clamp, one display.
 // Every disc except Undertone is redacted: the title and description are filler text
 // drawn as a mosaic, so the real wording never ships in the page source.
 // Locked discs carry no link at all, so there is nothing behind the password prompt to break into.
@@ -24,15 +24,6 @@ const DISCS = [
     kind: "Website",
     stack: "HTML, CSS, JavaScript",
     text: "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi.",
-    url: null,
-    redacted: true,
-    locked: true,
-  },
-  {
-    title: "Nisi Ut Aliq",
-    kind: "Website",
-    stack: "HTML, CSS, JavaScript",
-    text: "Duis aute irure dolor in reprehenderit in voluptate vel.",
     url: null,
     redacted: true,
     locked: true,
@@ -72,7 +63,8 @@ let hasIcons = false;
 
 const pad = (n) => String(n).padStart(2, "0");
 
-// Build discs and the 1-6 indicator on the display.
+// Build discs and the 1-N indicator on the display.
+discList.style.setProperty("--n", DISCS.length);
 const discButtons = DISCS.map((d, i) => {
   const li = document.createElement("li");
   const btn = document.createElement("button");
@@ -360,7 +352,7 @@ async function submitCode() {
   try {
     const payload = await decrypt(code);
     clearInterval(reading);
-    try { sessionStorage.setItem("unlocked", JSON.stringify(payload)); } catch (err) { /* storage blocked */ }
+    try { sessionStorage.setItem("unlocked-v2", JSON.stringify(payload)); } catch (err) { /* storage blocked */ }
     padStatus("Open", "  ok");
     failures = 0;
     setTimeout(() => {
@@ -396,7 +388,7 @@ function peelSticker() {
 
 // Already unlocked earlier in this tab: restore quietly.
 try {
-  const saved = sessionStorage.getItem("unlocked");
+  const saved = sessionStorage.getItem("unlocked-v2");
   if (saved) applyUnlock(JSON.parse(saved));
 } catch (err) { /* storage blocked or bad data */ }
 
@@ -480,7 +472,7 @@ document.addEventListener("discs-unlocked", () => { if (liner.open) fillTracklis
 // Linking to #notes opens the booklet straight away.
 if (location.hash === "#notes") requestAnimationFrame(openLiner);
 
-// Keyboard: arrows step, 1-6 jump straight to a disc, Enter plays.
+// Keyboard: arrows step, number keys jump straight to a disc, Enter plays.
 window.addEventListener("keydown", (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey || liner.open) return;
   if (e.target instanceof HTMLInputElement && e.target.name === "theme") return; // arrows move the theme switch
@@ -493,7 +485,7 @@ window.addEventListener("keydown", (e) => {
   }
   if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); select(index + 1); }
   else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); select(index - 1); }
-  else if (/^[1-6]$/.test(e.key)) select(Number(e.key) - 1);
+  else if (/^[1-9]$/.test(e.key) && Number(e.key) <= DISCS.length) select(Number(e.key) - 1);
   else if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement)) openCurrent();
 });
 

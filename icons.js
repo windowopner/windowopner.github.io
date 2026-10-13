@@ -140,40 +140,7 @@ window.Icons = (() => {
     return g;
   }
 
-  // 04 Y-Not Saloon: scissors snipping.
-  function scissors() {
-    const g = new THREE.Group();
-    const half = (side) => {
-      const h = new THREE.Group();
-      const bladeGeo = cyl(0.03, 0.22, 1.5, 4);
-      const blade = part(bladeGeo, PAL.silver, { outline: 1.12 });
-      blade.scale.z = 0.3;
-      blade.position.y = 0.75;
-      const shank = part(box(0.1, 0.42, 0.07), PAL.gold, { outline: 1.15 });
-      shank.position.set(side * 0.05, -0.22, 0);
-      shank.rotation.z = side * 0.25;
-      const ring = part(new THREE.TorusGeometry(0.27, 0.075, 6, 14), PAL.gold, { outline: 1.1 });
-      ring.position.set(side * 0.2, -0.68, 0);
-      h.add(blade, shank, ring);
-      return h;
-    };
-    const a = half(1);
-    const b = half(-1);
-    const screw = part(cyl(0.08, 0.08, 0.16, 8), PAL.dark, { outline: 1.1 });
-    screw.rotation.x = Math.PI / 2;
-    g.add(a, b, screw);
-    g.position.y = -0.1;
-    g.update = (t) => {
-      const snip = 0.1 + 0.28 * (0.5 + 0.5 * Math.sin(t * 4.5));
-      a.rotation.z = snip;
-      b.rotation.z = -snip;
-      g.rotation.y = Math.sin(t * 0.6) * 0.6;
-      g.rotation.x = -0.25;
-    };
-    return g;
-  }
-
-  // 05 Workspace Connector: a plug that keeps connecting to a socket.
+  // 04 Workspace Connector: a plug that keeps connecting to a socket.
   function plug() {
     const g = new THREE.Group();
     const socket = part(box(1.4, 1.4, 0.22), PAL.cream);
@@ -215,7 +182,7 @@ window.Icons = (() => {
     return g;
   }
 
-  // 06 WebGL Ripple: a drop falls and rings spread out.
+  // 05 WebGL Ripple: a drop falls and rings spread out.
   function drop() {
     const g = new THREE.Group();
     const pool = part(cyl(1.5, 1.5, 0.08, 20), PAL.teal);
@@ -286,7 +253,7 @@ window.Icons = (() => {
     key.position.set(-2, 4, 3);
     scene.add(key);
 
-    [books, equalizer, pen, scissors, plug, drop].forEach((make) => icons.push(make()));
+    [books, equalizer, pen, plug, drop].forEach((make) => icons.push(make()));
   }
 
   // Render every icon once at thumbnail size for the disc labels.
