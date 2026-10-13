@@ -4,136 +4,89 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sabu</title>
-  <meta name="description" content="Sabu builds web apps, Mac tools, and small graphics experiments.">
-  <meta name="color-scheme" content="light dark">
-  <meta property="og:title" content="Sabu">
-  <meta property="og:description" content="Web apps, Mac tools, and small graphics experiments.">
-  <meta property="og:image" content="https://windowopner.github.io/assets/folio.jpg">
+  <meta name="description" content="Sabu's projects, loaded into a six-disc player.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#140e0b">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Silkscreen&family=Geist:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="nav">
-    <div class="wrap nav-inner">
-      <a class="wordmark" href="#top">Sabu</a>
-      <nav aria-label="Primary">
-        <a href="#work">Work</a>
-        <a href="#about">About</a>
-        <a href="https://github.com/windowopner" target="_blank" rel="noopener">GitHub</a>
-      </nav>
-    </div>
-  </header>
+  <div class="room">
+    <header class="top">
+      <a class="mark" href="./">Sabu</a>
+      <a class="gh" href="https://github.com/windowopner" target="_blank" rel="noopener"><i class="ph ph-github-logo" aria-hidden="true"></i>GitHub</a>
+    </header>
 
-  <main id="top">
-    <section class="hero wrap">
-      <div class="hero-copy">
-        <h1>I build the things I want to use.</h1>
-        <p class="lede">Student developer making web apps, Mac tools, and small graphics experiments. Mostly for myself, sometimes for others.</p>
-        <div class="actions">
-          <a class="btn btn-primary" href="#work">See work</a>
-          <a class="btn btn-ghost" href="https://github.com/windowopner" target="_blank" rel="noopener">GitHub</a>
+    <main class="player" aria-label="Project player">
+      <div class="deck" id="deck">
+        <div class="glass">
+          <ol class="discs" id="discs" aria-label="Projects"></ol>
+          <div class="clamp" id="clamp" aria-hidden="true"><span class="arm"></span><span class="puck"></span></div>
         </div>
+        <div class="nameplate" aria-hidden="true"><span>SABU</span><span>6 DISC</span></div>
       </div>
-      <figure class="hero-visual">
-        <div class="ripple" id="ripple" role="img" aria-label="Interactive water ripple surface that reacts to the cursor">
-          <canvas id="ripple-canvas"></canvas>
+
+      <section class="console" aria-label="Now playing">
+        <div class="stage" id="stage-wrap"><canvas id="stage" width="100" height="100" aria-hidden="true"></canvas></div>
+
+        <div class="readout">
+          <div class="vfd" aria-live="polite">
+            <div class="vfd-row">
+              <span class="track" id="track">01</span>
+              <span class="title" id="title">STUDYOS</span>
+            </div>
+            <div class="vfd-row vfd-sub">
+              <span id="kind">WEB APP</span>
+              <ol class="slots" id="slots" aria-hidden="true"></ol>
+            </div>
+          </div>
+          <p class="desc" id="desc"></p>
+          <p class="stack" id="stack"></p>
         </div>
-        <figcaption>Move your cursor over it, or tap. This is WebGL Ripple, one of my experiments.</figcaption>
-      </figure>
-    </section>
 
-    <section class="work wrap" id="work" aria-labelledby="work-title">
-      <h2 id="work-title">Selected work</h2>
-
-      <div class="bento">
-        <article class="cell cell-studyos reveal">
-          <div class="cell-body">
-            <h3>StudyOS</h3>
-            <p>One place for a student's week: assignments, notes, flashcards, a to-do list, and an AI tutor.</p>
-            <ul class="chips" aria-label="Features">
-              <li>Assignments</li><li>Notes</li><li>Flashcards</li><li>AI tutor</li><li>Community</li>
-            </ul>
+        <div class="controls">
+          <div class="key-wrap">
+            <button class="key" id="prev" type="button" aria-label="Previous disc"><i class="ph ph-caret-left" aria-hidden="true"></i></button>
+            <span class="engrave" aria-hidden="true">Prev</span>
           </div>
-          <p class="stack">Next.js, Supabase, Tailwind</p>
-        </article>
-
-        <article class="cell cell-undertone reveal">
-          <div class="cell-body">
-            <h3>Undertone</h3>
-            <p>A macOS desktop background that moves with whatever music is playing, built on system audio capture.</p>
+          <div class="key-wrap">
+            <button class="key" id="next" type="button" aria-label="Next disc"><i class="ph ph-caret-right" aria-hidden="true"></i></button>
+            <span class="engrave" aria-hidden="true">Next</span>
           </div>
-          <p class="stack">Swift, macOS</p>
-        </article>
-
-        <article class="cell cell-shot reveal">
-          <a class="shot" href="https://project-km7wz.vercel.app" target="_blank" rel="noopener">
-            <img src="assets/folio.jpg" width="1440" height="900" loading="lazy" alt="Folio landing page with the headline Write for the world. Or just for you.">
-          </a>
-          <div class="cell-foot">
-            <div>
-              <h3>Folio</h3>
-              <p>A place to publish letters, essays, and poems, shared by link or @handle.</p>
-            </div>
-            <a class="link" href="https://project-km7wz.vercel.app" target="_blank" rel="noopener">Visit site</a>
+          <div class="key-wrap">
+            <a class="key key-play" id="play" target="_blank" rel="noopener"><i class="ph ph-play" aria-hidden="true"></i></a>
+            <span class="engrave" id="play-label" aria-hidden="true">Play</span>
           </div>
-        </article>
+        </div>
+      </section>
+    </main>
 
-        <article class="cell cell-shot reveal">
-          <a class="shot" href="https://project-4g5vb.vercel.app" target="_blank" rel="noopener">
-            <img src="assets/ynot.jpg" width="1440" height="900" loading="lazy" alt="Y-Not Saloon website hero in black and gold">
-          </a>
-          <div class="cell-foot">
-            <div>
-              <h3>Y-Not Saloon</h3>
-              <p>Website for a hair salon, in English, Malay, and Chinese.</p>
-            </div>
-            <a class="link" href="https://project-4g5vb.vercel.app" target="_blank" rel="noopener">Visit site</a>
-          </div>
-        </article>
-      </div>
-    </section>
+    <footer class="bottom">
+      <p>Student developer. <span class="hint-desk">Scroll, use the arrow keys, or press 1 to 6 to change disc.</span><span class="hint-touch">Swipe the discs or tap one to change.</span></p>
+    </footer>
+  </div>
 
-    <section class="smaller wrap" aria-labelledby="smaller-title">
-      <h2 id="smaller-title">Smaller things</h2>
-      <div class="rows">
-        <article class="row reveal">
-          <h3>Google Workspace connector for Claude</h3>
-          <p>An MCP server that lets Claude read my Classroom assignments and create Docs, Slides, and Drive files. Handles its own OAuth.</p>
-          <p class="stack">Python, FastAPI</p>
-        </article>
-        <article class="row reveal">
-          <h3>WebGL Ripple</h3>
-          <p>A water surface simulated on the GPU with the 2D wave equation. It is the panel at the top of this page.</p>
-          <p class="stack">Three.js, GLSL</p>
-        </article>
-        <article class="row reveal">
-          <h3><a href="https://windowopner.github.io/Archive-for-Web-projects/" target="_blank" rel="noopener">Studio Archive</a></h3>
-          <p>An experimental gallery page for collecting my web projects in one place.</p>
-          <p class="stack">HTML, CSS, JavaScript</p>
-        </article>
-      </div>
-    </section>
+  <div class="vignette" aria-hidden="true"></div>
+  <canvas class="film" id="film" aria-hidden="true"></canvas>
+  <span class="stamp" id="stamp" aria-hidden="true"></span>
 
-    <section class="about wrap" id="about" aria-labelledby="about-title">
-      <h2 id="about-title" class="visually-hidden">About</h2>
-      <p class="statement reveal">I'm Sabu. I build software in my spare time, usually because I wanted a tool that didn't exist yet. Right now I'm working on StudyOS and Undertone.</p>
-      <dl class="facts reveal">
-        <div><dt>Languages</dt><dd>TypeScript, Python, Swift</dd></div>
-        <div><dt>Often use</dt><dd>Next.js, Supabase, Three.js</dd></div>
-        <div><dt>Find me</dt><dd><a href="https://github.com/windowopner" target="_blank" rel="noopener">github.com/windowopner</a></dd></div>
-      </dl>
-    </section>
-  </main>
-
-  <footer class="footer wrap">
-    <span>Sabu, 2026</span>
-    <a href="#top">Back to top</a>
-  </footer>
+  <noscript>
+    <ul class="fallback">
+      <li>StudyOS: study tools for assignments, notes, flashcards, and an AI tutor.</li>
+      <li>Undertone: a macOS background that moves with your music.</li>
+      <li><a href="https://project-km7wz.vercel.app">Folio</a>: a place to publish letters, essays, and poems.</li>
+      <li><a href="https://project-4g5vb.vercel.app">Y-Not Saloon</a>: website for a hair salon.</li>
+      <li>Workspace Connector: an MCP server linking Claude to Google Workspace.</li>
+      <li><a href="ripple/">WebGL Ripple</a>: a GPU water surface.</li>
+    </ul>
+  </noscript>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
-  <script src="ripple.js" defer></script>
-  <script src="main.js" defer></script>
+  <script src="icons.js" defer></script>
+  <script src="film.js" defer></script>
+  <script src="app.js" defer></script>
 </body>
 </html>

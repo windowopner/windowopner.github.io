@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Water Ripple Cursor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="content">
+        <h1>Interactive Fluid Surface</h1>
+        <p>Move your cursor around the screen to interact with the WebGL water simulation.</p>
+        
+        <div class="card-grid">
+            <div class="card">
+                <h2>Real-time Physics</h2>
+                <p>Powered by a Ping-Pong Framebuffer simulation using the 2D wave equation.</p>
+            </div>
+            <div class="card">
+                <h2>No Dependencies</h2>
+                <p>Pure Three.js via CDN. No build steps, no node_modules. Perfect for GitHub Pages.</p>
+            </div>
+            <div class="card">
+                <h2>Non-intrusive</h2>
+                <p>Transparent overlay respects pointer events, allowing you to click elements underneath.</p>
+                <button onclick="alert('Button clicked!')">Test Click</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WebGL Overlay Canvas -->
+    <canvas id="glcanvas"></canvas>
+
+    <!-- Three.js (No build tools required) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

@@ -1,14 +1,18 @@
 # windowopner.github.io
 
-My portfolio site, served by GitHub Pages at https://windowopner.github.io.
+My portfolio, served by GitHub Pages at https://windowopner.github.io.
 
-Plain HTML, CSS, and JavaScript with no build step. The hero panel is a scoped version of my WebGL Ripple experiment (Three.js r128 from cdnjs).
+Six projects loaded into a six-disc player. Scroll, use the arrow keys, press 1 to 6, or swipe to change disc. Each project has a small pixel 3D icon (Three.js r128, rendered at low resolution and scaled up), and a film grain layer sits on top of everything.
 
-- `index.html`: page content. Add or edit projects here.
-- `style.css`: layout and colors (light and dark follow the system setting).
-- `ripple.js`: the water ripple simulation.
-- `main.js`: fade-in on scroll.
-- `assets/`: project screenshots.
+Plain HTML, CSS, and JavaScript with no build step.
+
+- `app.js`: the project list (`DISCS`), selection, display, and input.
+- `icons.js`: the six pixel 3D icons, one builder function each.
+- `film.js`: grain, dust, scratches, and flicker overlay.
+- `style.css`: the room, the player, and the console.
+- `ripple/`: the WebGL Ripple experiment, linked from disc 6.
+
+To add or swap a project, edit `DISCS` in `app.js` and the matching icon builder in `icons.js` (same order).
 
 Preview locally:
 
