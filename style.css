@@ -327,6 +327,15 @@ button { font: inherit; color: inherit; }
 
 .readout { min-width: 0; }
 
+.mosaic { display: block; image-rendering: pixelated; }
+
+.title .mosaic { filter: drop-shadow(0 0 4px rgb(255 173 77 / 0.45)); }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
 .vfd {
   border-radius: 6px;
   padding: 10px 16px 8px;

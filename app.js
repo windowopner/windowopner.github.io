@@ -1,11 +1,14 @@
 // The player: six discs, one clamp, one display.
+// Every disc except Undertone is redacted: the title and description are filler text
+// drawn as a mosaic, so the real wording never ships in the page source.
 const DISCS = [
   {
-    title: "StudyOS",
+    title: "Velorum",
     kind: "Web app",
     stack: "Next.js, Supabase, Tailwind",
-    text: "One place for a student's week: assignments, notes, flashcards, a to-do list, and an AI tutor.",
+    text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut.",
     url: null,
+    redacted: true,
   },
   {
     title: "Undertone",
@@ -15,32 +18,36 @@ const DISCS = [
     url: null,
   },
   {
-    title: "Folio",
+    title: "Arcus",
     kind: "Website",
     stack: "HTML, CSS, JavaScript",
-    text: "A place to publish letters, essays, and poems, shared by link or @handle.",
+    text: "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi.",
     url: "https://project-km7wz.vercel.app",
+    redacted: true,
   },
   {
-    title: "Y-Not Saloon",
+    title: "Nisi Ut Aliq",
     kind: "Website",
     stack: "HTML, CSS, JavaScript",
-    text: "Website for a hair salon, in English, Malay, and Chinese.",
+    text: "Duis aute irure dolor in reprehenderit in voluptate vel.",
     url: "https://project-4g5vb.vercel.app",
+    redacted: true,
   },
   {
-    title: "Workspace Connector",
+    title: "Tempor Incididunt U",
     kind: "MCP server",
     stack: "Python, FastAPI",
-    text: "Lets Claude read my Classroom assignments and make Docs, Slides, and Drive files. Handles its own OAuth.",
+    text: "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est.",
     url: null,
+    redacted: true,
   },
   {
-    title: "WebGL Ripple",
+    title: "Magna Aliqua",
     kind: "Experiment",
     stack: "Three.js, GLSL",
-    text: "A water surface simulated on the GPU with the 2D wave equation. Move your cursor through it.",
+    text: "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque lau.",
     url: "ripple/",
+    redacted: true,
   },
 ];
 
@@ -65,7 +72,7 @@ const discButtons = DISCS.map((d, i) => {
   const btn = document.createElement("button");
   btn.className = "disc";
   btn.type = "button";
-  btn.setAttribute("aria-label", `Disc ${i + 1}: ${d.title}`);
+  btn.setAttribute("aria-label", d.redacted ? `Disc ${i + 1}` : `Disc ${i + 1}: ${d.title}`);
   btn.innerHTML = `
     <span class="disc-face">
       <span class="disc-label"><img alt="" width="56" height="56"></span>
@@ -120,6 +127,58 @@ function writeDisplay(el, text) {
   run();
 }
 
+// Draw text at full size, shrink it so neighbouring pixels average out, then scale it
+// back up with hard edges. Alpha is boosted so thin strokes still read as solid blocks.
+function mosaic(el, text, block, singleLine) {
+  const cs = getComputedStyle(el);
+  const font = `${cs.fontSize} ${cs.fontFamily}`;
+  const size = parseFloat(cs.fontSize);
+  const lineHeight = parseFloat(cs.lineHeight) || size * 1.3;
+  const maxWidth = singleLine ? Infinity : el.clientWidth || 420;
+
+  const measure = document.createElement("canvas").getContext("2d");
+  measure.font = font;
+  const lines = [];
+  let line = "";
+  text.split(" ").forEach((word) => {
+    const next = line ? `${line} ${word}` : word;
+    if (measure.measureText(next).width > maxWidth && line) { lines.push(line); line = word; }
+    else line = next;
+  });
+  lines.push(line);
+
+  const w = Math.ceil(Math.max(...lines.map((l) => measure.measureText(l).width))) + 2;
+  const h = Math.ceil(lines.length * lineHeight);
+  const full = document.createElement("canvas");
+  full.width = w;
+  full.height = h;
+  const f = full.getContext("2d");
+  f.font = font;
+  f.fillStyle = cs.color;
+  f.textBaseline = "middle";
+  lines.forEach((l, k) => f.fillText(l, 0, k * lineHeight + lineHeight / 2));
+
+  const small = document.createElement("canvas");
+  small.width = Math.ceil(w / block);
+  small.height = Math.ceil(h / block);
+  const s = small.getContext("2d");
+  s.imageSmoothingEnabled = true;
+  s.drawImage(full, 0, 0, small.width, small.height);
+  const img = s.getImageData(0, 0, small.width, small.height);
+  for (let i = 3; i < img.data.length; i += 4) img.data[i] = Math.min(255, img.data[i] * 2.4);
+  s.putImageData(img, 0, 0);
+
+  small.className = "mosaic";
+  small.style.width = `${small.width * block}px`;
+  small.style.height = `${small.height * block}px`;
+  small.setAttribute("aria-hidden", "true");
+
+  const label = document.createElement("span");
+  label.className = "sr-only";
+  label.textContent = "Redacted";
+  el.replaceChildren(small, label);
+}
+
 function select(i) {
   index = (i + DISCS.length) % DISCS.length;
   const d = DISCS[index];
@@ -130,21 +189,26 @@ function select(i) {
 
   clearTimeout(scrambleTimer);
   $("track").textContent = pad(index + 1);
-  writeDisplay($("title"), d.title.toUpperCase());
   $("kind").textContent = d.kind;
-  $("desc").textContent = d.text;
+  if (d.redacted) {
+    mosaic($("title"), d.title.toUpperCase(), 6, true);
+    mosaic($("desc"), d.text, 5, false);
+  } else {
+    writeDisplay($("title"), d.title.toUpperCase());
+    $("desc").textContent = d.text;
+  }
   $("stack").textContent = d.stack;
 
   if (d.url) {
     play.href = d.url;
     play.removeAttribute("aria-disabled");
-    play.setAttribute("aria-label", `Open ${d.title}`);
+    play.setAttribute("aria-label", d.redacted ? `Open disc ${index + 1}` : `Open ${d.title}`);
     play.innerHTML = '<i class="ph ph-play" aria-hidden="true"></i>';
     playLabel.textContent = "Play";
   } else {
     play.removeAttribute("href");
     play.setAttribute("aria-disabled", "true");
-    play.setAttribute("aria-label", `${d.title} is private for now`);
+    play.setAttribute("aria-label", d.redacted ? `Disc ${index + 1} is private for now` : `${d.title} is private for now`);
     play.innerHTML = '<i class="ph ph-lock-simple" aria-hidden="true"></i>';
     playLabel.textContent = "Private";
   }
@@ -206,9 +270,19 @@ deck.addEventListener("pointerup", (e) => {
 
 new ResizeObserver(moveClamp).observe(glass);
 
+// Re-wrap the mosaic when the description column changes width.
+let wrapWidth = 0;
+new ResizeObserver(([entry]) => {
+  const width = Math.round(entry.contentRect.width);
+  if (width !== wrapWidth && DISCS[index].redacted) mosaic($("desc"), DISCS[index].text, 5, false);
+  wrapWidth = width;
+}).observe($("desc"));
+
 // Date stamp, like an old digital camera.
 const now = new Date();
 $("stamp").textContent = `'${String(now.getFullYear()).slice(2)} ${pad(now.getMonth() + 1)} ${pad(now.getDate())}`;
 
+// Canvas text needs the web fonts, so wait for them before the first draw.
+document.fonts.ready.then(() => select(index));
 select(0);
 if (hasIcons) Icons.start({ reducedMotion });

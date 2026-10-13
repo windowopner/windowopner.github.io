@@ -30,8 +30,9 @@
   }
 
   function resize() {
-    w = Math.ceil(window.innerWidth / SCALE);
-    h = Math.ceil(window.innerHeight / SCALE);
+    // A tab opened in the background can report a zero-size window; keep at least 1px.
+    w = Math.max(1, Math.ceil(window.innerWidth / SCALE));
+    h = Math.max(1, Math.ceil(window.innerHeight / SCALE));
     canvas.width = w;
     canvas.height = h;
     makeGrain();
