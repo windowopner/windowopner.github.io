@@ -1,6 +1,7 @@
 // The player: six discs, one clamp, one display.
 // Every disc except Undertone is redacted: the title and description are filler text
 // drawn as a mosaic, so the real wording never ships in the page source.
+// Locked discs carry no link at all, so there is nothing behind the password prompt to break into.
 const DISCS = [
   {
     title: "Velorum",
@@ -9,6 +10,7 @@ const DISCS = [
     text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut.",
     url: null,
     redacted: true,
+    locked: true,
   },
   {
     title: "Undertone",
@@ -22,16 +24,18 @@ const DISCS = [
     kind: "Website",
     stack: "HTML, CSS, JavaScript",
     text: "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi.",
-    url: "https://project-km7wz.vercel.app",
+    url: null,
     redacted: true,
+    locked: true,
   },
   {
     title: "Nisi Ut Aliq",
     kind: "Website",
     stack: "HTML, CSS, JavaScript",
     text: "Duis aute irure dolor in reprehenderit in voluptate vel.",
-    url: "https://project-4g5vb.vercel.app",
+    url: null,
     redacted: true,
+    locked: true,
   },
   {
     title: "Tempor Incididunt U",
@@ -40,14 +44,16 @@ const DISCS = [
     text: "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est.",
     url: null,
     redacted: true,
+    locked: true,
   },
   {
     title: "Magna Aliqua",
     kind: "Experiment",
     stack: "Three.js, GLSL",
     text: "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque lau.",
-    url: "ripple/",
+    url: null,
     redacted: true,
+    locked: true,
   },
 ];
 
@@ -199,14 +205,18 @@ function select(i) {
   }
   $("stack").textContent = d.stack;
 
+  play.classList.toggle("locked", Boolean(d.locked));
   if (d.url) {
-    play.href = d.url;
     play.removeAttribute("aria-disabled");
-    play.setAttribute("aria-label", d.redacted ? `Open disc ${index + 1}` : `Open ${d.title}`);
+    play.setAttribute("aria-label", `Open ${d.title}`);
     play.innerHTML = '<i class="ph ph-play" aria-hidden="true"></i>';
     playLabel.textContent = "Play";
+  } else if (d.locked) {
+    play.removeAttribute("aria-disabled");
+    play.setAttribute("aria-label", `Disc ${index + 1} is locked. Enter password`);
+    play.innerHTML = '<i class="ph ph-play" aria-hidden="true"></i><span class="lock-cover" aria-hidden="true"><i class="ph ph-lock-simple"></i></span>';
+    playLabel.textContent = "Locked";
   } else {
-    play.removeAttribute("href");
     play.setAttribute("aria-disabled", "true");
     play.setAttribute("aria-label", d.redacted ? `Disc ${index + 1} is private for now` : `${d.title} is private for now`);
     play.innerHTML = '<i class="ph ph-lock-simple" aria-hidden="true"></i>';
@@ -224,14 +234,35 @@ function select(i) {
 function openCurrent() {
   const d = DISCS[index];
   if (d.url) window.open(d.url, "_blank", "noopener");
+  else if (d.locked) openLockbox();
 }
+
+// Password prompt for locked discs. Unlocking is switched off for now: the Unlock
+// button stays disabled and the form never submits anything.
+const lockbox = $("lockbox");
+const lockInput = $("lock-input");
+
+function openLockbox() {
+  $("lock-disc").textContent = `Disc ${pad(index + 1)}`;
+  lockInput.value = "";
+  lockbox.showModal();
+  lockInput.focus();
+}
+
+play.addEventListener("click", openCurrent);
+// Unlock is the form's only submit button and it is disabled, so Enter does nothing.
+$("lock-form").addEventListener("submit", (e) => e.preventDefault());
+$("lock-cancel").addEventListener("click", () => lockbox.close());
+lockbox.addEventListener("click", (e) => {
+  if (e.target === lockbox) lockbox.close();
+});
 
 $("prev").addEventListener("click", () => select(index - 1));
 $("next").addEventListener("click", () => select(index + 1));
 
 // Keyboard: arrows step, 1-6 jump straight to a disc, Enter plays.
 window.addEventListener("keydown", (e) => {
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.metaKey || e.ctrlKey || e.altKey || lockbox.open) return;
   if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); select(index + 1); }
   else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); select(index - 1); }
   else if (/^[1-6]$/.test(e.key)) select(Number(e.key) - 1);
@@ -244,7 +275,7 @@ let wheelSum = 0;
 let wheelAt = 0;
 let wheelIdle = 0;
 window.addEventListener("wheel", (e) => {
-  if (!fixedLayout.matches) return;
+  if (!fixedLayout.matches || lockbox.open) return;
   e.preventDefault();
   wheelSum += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
   clearTimeout(wheelIdle);

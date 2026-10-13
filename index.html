@@ -57,7 +57,7 @@
             <span class="engrave" aria-hidden="true">Next</span>
           </div>
           <div class="key-wrap">
-            <a class="key key-play" id="play" target="_blank" rel="noopener"><i class="ph ph-play" aria-hidden="true"></i></a>
+            <button class="key key-play" id="play" type="button"><i class="ph ph-play" aria-hidden="true"></i></button>
             <span class="engrave" id="play-label" aria-hidden="true">Play</span>
           </div>
         </div>
@@ -68,6 +68,20 @@
       <p>RAS G9. <span class="hint-desk">Scroll, use the arrow keys, or press 1 to 6 to change disc.</span><span class="hint-touch">Swipe the discs or tap one to change.</span></p>
     </footer>
   </div>
+
+  <dialog class="lockbox" id="lockbox" aria-labelledby="lock-title">
+    <form method="dialog" id="lock-form">
+      <div class="lock-vfd" aria-hidden="true"><span id="lock-disc">Disc 01</span><span>Locked</span></div>
+      <h2 id="lock-title">Enter password</h2>
+      <label class="lock-label" for="lock-input">Password</label>
+      <input class="lock-input" id="lock-input" type="password" autocomplete="off" spellcheck="false" aria-describedby="lock-note">
+      <p class="lock-note" id="lock-note">Unlocking is turned off for now.</p>
+      <div class="lock-actions">
+        <button class="pill" type="button" id="lock-cancel">Cancel</button>
+        <button class="pill pill-amber" type="submit" value="unlock" disabled>Unlock</button>
+      </div>
+    </form>
+  </dialog>
 
   <div class="vignette" aria-hidden="true"></div>
   <canvas class="film" id="film" aria-hidden="true"></canvas>

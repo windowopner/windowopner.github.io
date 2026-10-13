@@ -10,7 +10,6 @@ Plain HTML, CSS, and JavaScript with no build step.
 - `icons.js`: the six pixel 3D icons, one builder function each.
 - `film.js`: grain, dust, scratches, and flicker overlay.
 - `style.css`: the room, the player, and the console.
-- `ripple/`: a small experiment, linked from disc 6.
 
 To add or swap a project, edit `DISCS` in `app.js` and the matching icon builder in `icons.js` (same order).
 
