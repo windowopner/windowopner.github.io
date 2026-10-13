@@ -378,6 +378,8 @@ window.Orbit = (() => {
     start,
     stop,
     focus: (i) => { if (running) focus(i); },
+    // Throw the ring back by part of a turn so the spring sweeps it in (used by the intro).
+    kick: (turns) => { if (running && !reduced) { ring -= TAU * turns; velocity = 0; } },
     onSelect: null,
   };
   return api;

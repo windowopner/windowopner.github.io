@@ -12,7 +12,13 @@ Plain HTML, CSS, and JavaScript with no build step.
 - `icons.js`: the six pixel 3D icons, one builder function each.
 - `film.js`: grain, dust, scratches, and flicker overlay.
 - `orbit.js`: the Space theme (pixel planet, ring of discs, stars).
+- `tools/lock.mjs`: encrypts `private/discs.json` (git-ignored) into `locks.json` with the keypad code.
+- `favicon.svg`, `apple-touch-icon.png`, `og.png`: icon and link preview.
 - `style.css`: the room, the player, and the console.
+
+First visit plays a short power-on intro (add `?intro` to see it again, `?nointro` to skip). The Notes button opens the liner notes booklet (link straight to it with `#notes`).
+
+**Locked discs.** Every disc except Undertone ships as filler text drawn as a mosaic. Their real title, description, and link live only in `private/discs.json` on this computer. To set or change the keypad code (4 to 12 digits), run `node tools/lock.mjs` and commit the new `locks.json`. The page decrypts it in the browser when someone enters the code; a short numeric code can still be brute-forced offline, so use 8 or more digits.
 
 To add or swap a project, edit `DISCS` in `app.js` and the matching icon builder in `icons.js` (same order).
 

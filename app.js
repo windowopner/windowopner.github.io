@@ -85,6 +85,7 @@ const discButtons = DISCS.map((d, i) => {
       <span class="disc-hub"></span>
     </span>
     <span class="disc-num">${pad(i + 1)}</span>`;
+  btn.style.setProperty("--i", i);
   btn.addEventListener("click", () => select(i));
   btn.addEventListener("dblclick", openCurrent);
   li.appendChild(btn);
@@ -279,25 +280,125 @@ function openCurrent() {
   else if (d.locked) openPad();
 }
 
-// Keypad for locked discs. Unlocking is switched off for now: OK stays disabled and
-// nothing is ever checked, because there is no link behind the lock to reveal.
+// Keypad for locked discs. One code opens every locked disc: locks.json holds their
+// real title, text, and link, encrypted (PBKDF2-SHA256 + AES-GCM) with that code by
+// tools/lock.mjs. A wrong code simply fails to decrypt; nothing secret is in the page.
 const controls = $("controls");
 const hatch = $("hatch");
+const okKey = hatch.querySelector('[data-k="OK"]');
+const MAX_CODE = 12;
 let code = "";
+let locks = null;     // encrypted blob, once fetched
+let busy = false;     // decrypting
+let failures = 0;
+let waitUntil = 0;
+
+fetch(`locks.json?v=${document.querySelector('script[src^="app.js"]').src.split("v=")[1] || ""}`)
+  .then((r) => (r.ok ? r.json() : null))
+  .then((data) => { locks = data; showCode(); })
+  .catch(() => { locks = null; });
+
+function padStatus(left, right) {
+  $("pad-disc").textContent = left;
+  $("pad-code").textContent = right;
+}
 
 function showCode() {
-  $("pad-code").textContent = code ? "*".repeat(code.length).padEnd(6, "-") : "------";
+  const shown = "*".repeat(Math.min(code.length, 8)) + (code.length > 8 ? "+" : "");
+  padStatus(locks ? "Code" : "Locked", code ? shown.padEnd(8, "-") : "--------");
+  okKey.disabled = !locks || busy || code.length < 4;
+  okKey.setAttribute("aria-label", locks ? "Unlock" : "Unlock, not available");
 }
 
 function openPad() {
   if (controls.classList.contains("open")) return;
   code = "";
   showCode();
-  $("pad-disc").textContent = `Disc ${pad(index + 1)}`;
   controls.classList.add("open");
   hatch.inert = false;
   play.setAttribute("aria-expanded", "true");
 }
+
+const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+async function decrypt(pin) {
+  const { subtle } = crypto;
+  const base = await subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveKey"]);
+  const key = await subtle.deriveKey(
+    { name: "PBKDF2", hash: "SHA-256", salt: b64(locks.salt), iterations: locks.iterations },
+    base,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"],
+  );
+  const plain = await subtle.decrypt({ name: "AES-GCM", iv: b64(locks.iv) }, key, b64(locks.data));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+// Swap the redacted discs for the real ones.
+function applyUnlock(payload) {
+  Object.entries(payload).forEach(([k, real]) => {
+    const i = Number(k);
+    if (!DISCS[i]) return;
+    DISCS[i] = { ...DISCS[i], ...real, redacted: false, locked: false };
+    discButtons[i].setAttribute("aria-label", `Disc ${i + 1}: ${DISCS[i].title}`);
+  });
+  document.dispatchEvent(new Event("discs-unlocked"));
+}
+
+async function submitCode() {
+  if (!locks || busy || code.length < 4) return;
+  const now = Date.now();
+  if (now < waitUntil) {
+    padStatus("Wait", `${Math.ceil((waitUntil - now) / 1000)}s`.padStart(8, " "));
+    return;
+  }
+  busy = true;
+  showCode();
+  let dots = 0;
+  const reading = setInterval(() => padStatus("Reading", ".".repeat((dots++ % 3) + 1).padEnd(8, " ")), 160);
+  try {
+    const payload = await decrypt(code);
+    clearInterval(reading);
+    try { sessionStorage.setItem("unlocked", JSON.stringify(payload)); } catch (err) { /* storage blocked */ }
+    padStatus("Open", "  ok");
+    failures = 0;
+    setTimeout(() => {
+      busy = false;
+      closePad();
+      peelSticker();
+      applyUnlock(payload);
+      setTimeout(() => select(index), reducedMotion ? 0 : 420);
+    }, 380);
+  } catch (err) {
+    clearInterval(reading);
+    busy = false;
+    failures++;
+    // Back off after a few misses: 1s, 2s, 4s, ... up to 30s.
+    if (failures >= 3) waitUntil = Date.now() + Math.min(30000, 1000 * 2 ** (failures - 3));
+    code = "";
+    padStatus("Wrong", "  code");
+    hatch.classList.remove("shake");
+    void hatch.offsetWidth;
+    hatch.classList.add("shake");
+    setTimeout(showCode, 900);
+  }
+}
+
+function peelSticker() {
+  const sticker = $("sticker");
+  if (reducedMotion) return;
+  sticker.classList.remove("peel");
+  void sticker.offsetWidth;
+  sticker.classList.add("peel");
+  setTimeout(() => sticker.classList.remove("peel"), 700);
+}
+
+// Already unlocked earlier in this tab: restore quietly.
+try {
+  const saved = sessionStorage.getItem("unlocked");
+  if (saved) applyUnlock(JSON.parse(saved));
+} catch (err) { /* storage blocked or bad data */ }
 
 function closePad() {
   if (!controls.classList.contains("open")) return;
@@ -307,8 +408,10 @@ function closePad() {
 }
 
 function pressPad(k) {
+  if (busy) return;
+  if (k === "OK") { submitCode(); return; }
   if (k === "C") code = "";
-  else if (/^\d$/.test(k) && code.length < 6) code += k;
+  else if (/^\d$/.test(k) && code.length < MAX_CODE) code += k;
   showCode();
 }
 
@@ -331,16 +434,62 @@ function flashKey(k) {
 $("prev").addEventListener("click", () => select(index - 1));
 $("next").addEventListener("click", () => select(index + 1));
 
+// Liner notes: a booklet that slides out of the case.
+const liner = $("liner");
+const tracklist = $("tracklist");
+
+function fillTracklist() {
+  tracklist.replaceChildren(...DISCS.map((d, i) => {
+    const li = document.createElement("li");
+    const num = document.createElement("span");
+    num.className = "track-num";
+    num.textContent = pad(i + 1);
+    const name = document.createElement("span");
+    if (d.redacted) {
+      name.className = "redact";
+      name.style.setProperty("--len", d.title.length);
+      name.textContent = "Redacted";
+    } else {
+      name.textContent = d.title;
+    }
+    const kind = document.createElement("span");
+    kind.className = "track-kind";
+    kind.textContent = d.kind;
+    li.append(num, name, kind);
+    return li;
+  }));
+}
+
+function openLiner() {
+  fillTracklist();
+  liner.showModal();
+  requestAnimationFrame(() => liner.classList.add("in"));
+}
+
+function closeLiner() {
+  if (!liner.open) return;
+  liner.classList.remove("in");
+  setTimeout(() => liner.close(), reducedMotion ? 0 : 280);
+}
+
+$("notes-btn").addEventListener("click", openLiner);
+$("liner-close").addEventListener("click", closeLiner);
+liner.addEventListener("cancel", (e) => { e.preventDefault(); closeLiner(); });
+liner.addEventListener("click", (e) => { if (e.target === liner) closeLiner(); });
+document.addEventListener("discs-unlocked", () => { if (liner.open) fillTracklist(); });
+// Linking to #notes opens the booklet straight away.
+if (location.hash === "#notes") requestAnimationFrame(openLiner);
+
 // Keyboard: arrows step, 1-6 jump straight to a disc, Enter plays.
 window.addEventListener("keydown", (e) => {
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.metaKey || e.ctrlKey || e.altKey || liner.open) return;
   if (e.target instanceof HTMLInputElement && e.target.name === "theme") return; // arrows move the theme switch
   // While the keypad is open, number keys type into it instead of changing disc.
   if (controls.classList.contains("open")) {
     if (/^\d$/.test(e.key)) { pressPad(e.key); flashKey(e.key); return; }
     if (e.key === "Backspace") { code = code.slice(0, -1); showCode(); return; }
     if (e.key === "Escape") { closePad(); play.focus(); return; }
-    if (e.key === "Enter") return;
+    if (e.key === "Enter") { e.preventDefault(); pressPad("OK"); flashKey("OK"); return; }
   }
   if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); select(index + 1); }
   else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); select(index - 1); }
@@ -360,7 +509,7 @@ let wheelPeak = 0;   // biggest delta since the last step
 let wheelTrough = 0; // smallest delta after that peak
 let wheelIdle = 0;
 window.addEventListener("wheel", (e) => {
-  if (!fixedLayout.matches || controls.classList.contains("open")) return;
+  if (!fixedLayout.matches || controls.classList.contains("open") || liner.open) return;
   e.preventDefault();
   const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
   const size = Math.abs(delta);
@@ -410,7 +559,9 @@ const now = new Date();
 $("stamp").textContent = `'${String(now.getFullYear()).slice(2)} ${pad(now.getMonth() + 1)} ${pad(now.getDate())}`;
 
 // Canvas text needs the web fonts, so wait for them before the first draw.
-document.fonts.ready.then(() => select(index));
+document.fonts.ready.then(() => {
+  if (!document.documentElement.classList.contains("booting")) select(index);
+});
 // Themes. The choice is remembered per browser when storage is available.
 const THEMES = ["room", "space"];
 const themeSwitch = $("theme-switch");
@@ -453,3 +604,45 @@ if (window.Orbit) Orbit.onSelect = (i) => { if (i !== index) select(i); };
 select(0);
 applyTheme(savedTheme);
 if (hasIcons) Icons.start({ reducedMotion });
+
+// Power-on intro, first visit only: lights come up, the display says hello,
+// discs load one by one, and the clamp sets down on disc 1. Any key or click skips it.
+(function boot() {
+  const root = document.documentElement;
+  let seen = false;
+  try { seen = localStorage.getItem("booted") === "1"; } catch (err) { seen = false; }
+  const params = new URLSearchParams(location.search);
+  if ((seen && !params.has("intro")) || reducedMotion || params.has("nointro")) return;
+
+  const timers = [];
+  const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+  let done = false;
+
+  root.classList.add("booting");
+  clamp.classList.add("lifted");
+  $("track").textContent = "--";
+  $("title").textContent = "HELLO";
+  $("kind").textContent = "";
+
+  function finish() {
+    if (done) return;
+    done = true;
+    timers.forEach(clearTimeout);
+    root.classList.remove("booting", "power");
+    root.classList.add("loading");
+    setTimeout(() => root.classList.remove("loading"), 1200);
+    $("title").classList.remove("blink");
+    select(index);
+    setTimeout(() => clamp.classList.remove("lifted"), 260);
+    window.removeEventListener("keydown", skip, true);
+    window.removeEventListener("pointerdown", skip, true);
+    try { localStorage.setItem("booted", "1"); } catch (err) { /* storage blocked */ }
+  }
+  function skip() { finish(); }
+
+  at(250, () => { root.classList.add("power"); $("title").classList.add("blink"); });
+  at(1250, () => { if (window.Orbit) Orbit.kick(0.35); });
+  at(1250, finish);
+  window.addEventListener("keydown", skip, true);
+  window.addEventListener("pointerdown", skip, true);
+})();

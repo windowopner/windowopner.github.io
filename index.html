@@ -7,12 +7,22 @@
   <meta name="description" content="Sabu's projects, loaded into a six-disc player.">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#140e0b">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://windowopner.github.io/">
+  <meta property="og:title" content="Sabu">
+  <meta property="og:description" content="Six projects, loaded into a six-disc player.">
+  <meta property="og:image" content="https://windowopner.github.io/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Silkscreen&family=Geist:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-  <link rel="stylesheet" href="style.css?v=202610132209">
+  <link rel="stylesheet" href="style.css?v=202610132225">
 </head>
 <body>
   <canvas class="sky" id="sky" aria-hidden="true"></canvas>
@@ -26,7 +36,10 @@
         <label for="theme-space">Space</label>
         <span class="theme-knob" aria-hidden="true"></span>
       </div>
-      <a class="gh" href="https://github.com/windowopner" target="_blank" rel="noopener"><i class="ph ph-github-logo" aria-hidden="true"></i>GitHub</a>
+      <div class="top-links">
+        <button class="gh" id="notes-btn" type="button" aria-haspopup="dialog"><i class="ph ph-book-open-text" aria-hidden="true"></i><span class="gh-label">Notes</span></button>
+        <a class="gh" href="https://github.com/windowopner" target="_blank" rel="noopener"><i class="ph ph-github-logo" aria-hidden="true"></i><span class="gh-label">GitHub</span></a>
+      </div>
     </header>
 
     <main class="player" aria-label="Project player">
@@ -61,7 +74,7 @@
         <div class="controls" id="controls">
           <div class="hatch" id="hatch" inert>
             <div class="keypad" role="group" aria-label="Password keypad">
-              <div class="pad-vfd" aria-live="polite"><span id="pad-disc">Disc 01</span><span id="pad-code">------</span></div>
+              <div class="pad-vfd" aria-live="polite"><span id="pad-disc">Code</span><span id="pad-code">--------</span></div>
               <div class="pad-grid">
               <button class="pad-key" type="button" data-k="1">1</button>
               <button class="pad-key" type="button" data-k="2">2</button>
@@ -74,7 +87,7 @@
               <button class="pad-key" type="button" data-k="9">9</button>
               <button class="pad-key pad-fn" type="button" data-k="C" aria-label="Clear">C</button>
               <button class="pad-key" type="button" data-k="0">0</button>
-              <button class="pad-key pad-fn" type="button" data-k="OK" disabled aria-label="Unlock, turned off for now">OK</button>
+              <button class="pad-key pad-fn" type="button" data-k="OK" disabled aria-label="Unlock">OK</button>
               </div>
             </div>
             <span class="door door-l" aria-hidden="true"></span>
@@ -105,6 +118,30 @@
     </footer>
   </div>
 
+  <dialog class="liner" id="liner" aria-labelledby="liner-title">
+    <div class="booklet">
+      <section class="page page-cover">
+        <p class="cover-mark">Sabu</p>
+        <p class="cover-sub">6 Disc</p>
+        <img class="cover-disc" src="favicon.svg" alt="" width="128" height="128">
+        <ol class="tracklist" id="tracklist" aria-label="Track list"></ol>
+      </section>
+      <section class="page page-notes">
+        <h2 id="liner-title">Liner notes</h2>
+        <p class="liner-lead">RAS G9.</p>
+        <p>Six things I made, loaded into one changer. Five are still under wraps until the right code goes into the keypad.</p>
+        <dl class="credits">
+          <div><dt>Written and built by</dt><dd>Sabu</dd></div>
+          <div><dt>Languages</dt><dd>TypeScript, Python, Swift</dd></div>
+          <div><dt>Pixel icons</dt><dd>Three.js, rendered small and scaled up</dd></div>
+          <div><dt>Type</dt><dd>VT323, Silkscreen, Geist</dd></div>
+          <div><dt>Find me</dt><dd><a href="https://github.com/windowopner" target="_blank" rel="noopener">github.com/windowopner</a></dd></div>
+        </dl>
+        <button class="pill liner-close" id="liner-close" type="button" autofocus>Close</button>
+      </section>
+    </div>
+  </dialog>
+
   <div class="vignette" aria-hidden="true"></div>
   <canvas class="film" id="film" aria-hidden="true"></canvas>
   <span class="stamp" id="stamp" aria-hidden="true"></span>
@@ -121,9 +158,9 @@
   </noscript>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
-  <script src="icons.js?v=202610132209" defer></script>
-  <script src="film.js?v=202610132209" defer></script>
-  <script src="orbit.js?v=202610132209" defer></script>
-  <script src="app.js?v=202610132209" defer></script>
+  <script src="icons.js?v=202610132225" defer></script>
+  <script src="film.js?v=202610132225" defer></script>
+  <script src="orbit.js?v=202610132225" defer></script>
+  <script src="app.js?v=202610132225" defer></script>
 </body>
 </html>
