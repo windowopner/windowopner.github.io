@@ -205,7 +205,9 @@ function select(i) {
   }
   $("stack").textContent = d.stack;
 
+  closePad();
   play.classList.toggle("locked", Boolean(d.locked));
+  if (!d.locked) play.removeAttribute("aria-expanded");
   if (d.url) {
     play.removeAttribute("aria-disabled");
     play.setAttribute("aria-label", `Open ${d.title}`);
@@ -213,8 +215,9 @@ function select(i) {
     playLabel.textContent = "Play";
   } else if (d.locked) {
     play.removeAttribute("aria-disabled");
-    play.setAttribute("aria-label", `Disc ${index + 1} is locked. Enter password`);
-    play.innerHTML = '<i class="ph ph-play" aria-hidden="true"></i><span class="lock-cover" aria-hidden="true"><i class="ph ph-lock-simple"></i></span>';
+    play.setAttribute("aria-label", `Disc ${index + 1} is locked. Open keypad`);
+    play.setAttribute("aria-expanded", "false");
+    play.innerHTML = '<i class="ph ph-play" aria-hidden="true"></i>';
     playLabel.textContent = "Locked";
   } else {
     play.setAttribute("aria-disabled", "true");
@@ -234,35 +237,71 @@ function select(i) {
 function openCurrent() {
   const d = DISCS[index];
   if (d.url) window.open(d.url, "_blank", "noopener");
-  else if (d.locked) openLockbox();
+  else if (d.locked) openPad();
 }
 
-// Password prompt for locked discs. Unlocking is switched off for now: the Unlock
-// button stays disabled and the form never submits anything.
-const lockbox = $("lockbox");
-const lockInput = $("lock-input");
+// Keypad for locked discs. Unlocking is switched off for now: OK stays disabled and
+// nothing is ever checked, because there is no link behind the lock to reveal.
+const controls = $("controls");
+const hatch = $("hatch");
+let code = "";
 
-function openLockbox() {
-  $("lock-disc").textContent = `Disc ${pad(index + 1)}`;
-  lockInput.value = "";
-  lockbox.showModal();
-  lockInput.focus();
+function showCode() {
+  $("pad-code").textContent = code ? "*".repeat(code.length).padEnd(6, "-") : "------";
 }
 
-play.addEventListener("click", openCurrent);
-// Unlock is the form's only submit button and it is disabled, so Enter does nothing.
-$("lock-form").addEventListener("submit", (e) => e.preventDefault());
-$("lock-cancel").addEventListener("click", () => lockbox.close());
-lockbox.addEventListener("click", (e) => {
-  if (e.target === lockbox) lockbox.close();
+function openPad() {
+  if (controls.classList.contains("open")) return;
+  code = "";
+  showCode();
+  $("pad-disc").textContent = `Disc ${pad(index + 1)}`;
+  controls.classList.add("open");
+  hatch.inert = false;
+  play.setAttribute("aria-expanded", "true");
+}
+
+function closePad() {
+  if (!controls.classList.contains("open")) return;
+  controls.classList.remove("open");
+  hatch.inert = true;
+  if (play.hasAttribute("aria-expanded")) play.setAttribute("aria-expanded", "false");
+}
+
+function pressPad(k) {
+  if (k === "C") code = "";
+  else if (/^\d$/.test(k) && code.length < 6) code += k;
+  showCode();
+}
+
+play.addEventListener("click", () => {
+  if (controls.classList.contains("open")) closePad();
+  else openCurrent();
 });
+hatch.addEventListener("click", (e) => {
+  const key = e.target.closest(".pad-key");
+  if (key && !key.disabled) pressPad(key.dataset.k);
+});
+
+function flashKey(k) {
+  const key = hatch.querySelector(`[data-k="${k}"]`);
+  if (!key) return;
+  key.classList.add("pressed");
+  setTimeout(() => key.classList.remove("pressed"), 120);
+}
 
 $("prev").addEventListener("click", () => select(index - 1));
 $("next").addEventListener("click", () => select(index + 1));
 
 // Keyboard: arrows step, 1-6 jump straight to a disc, Enter plays.
 window.addEventListener("keydown", (e) => {
-  if (e.metaKey || e.ctrlKey || e.altKey || lockbox.open) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  // While the keypad is open, number keys type into it instead of changing disc.
+  if (controls.classList.contains("open")) {
+    if (/^\d$/.test(e.key)) { pressPad(e.key); flashKey(e.key); return; }
+    if (e.key === "Backspace") { code = code.slice(0, -1); showCode(); return; }
+    if (e.key === "Escape") { closePad(); play.focus(); return; }
+    if (e.key === "Enter") return;
+  }
   if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); select(index + 1); }
   else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); select(index - 1); }
   else if (/^[1-6]$/.test(e.key)) select(Number(e.key) - 1);
@@ -275,7 +314,7 @@ let wheelSum = 0;
 let wheelAt = 0;
 let wheelIdle = 0;
 window.addEventListener("wheel", (e) => {
-  if (!fixedLayout.matches || lockbox.open) return;
+  if (!fixedLayout.matches || controls.classList.contains("open")) return;
   e.preventDefault();
   wheelSum += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
   clearTimeout(wheelIdle);

@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Silkscreen&family=Geist:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -47,18 +48,43 @@
           <p class="stack" id="stack"></p>
         </div>
 
-        <div class="controls">
-          <div class="key-wrap">
-            <button class="key" id="prev" type="button" aria-label="Previous disc"><i class="ph ph-caret-left" aria-hidden="true"></i></button>
-            <span class="engrave" aria-hidden="true">Prev</span>
+        <div class="controls" id="controls">
+          <div class="hatch" id="hatch" inert>
+            <div class="keypad" role="group" aria-label="Password keypad">
+              <div class="pad-vfd" aria-live="polite"><span id="pad-disc">Disc 01</span><span id="pad-code">------</span></div>
+              <div class="pad-grid">
+              <button class="pad-key" type="button" data-k="1">1</button>
+              <button class="pad-key" type="button" data-k="2">2</button>
+              <button class="pad-key" type="button" data-k="3">3</button>
+              <button class="pad-key" type="button" data-k="4">4</button>
+              <button class="pad-key" type="button" data-k="5">5</button>
+              <button class="pad-key" type="button" data-k="6">6</button>
+              <button class="pad-key" type="button" data-k="7">7</button>
+              <button class="pad-key" type="button" data-k="8">8</button>
+              <button class="pad-key" type="button" data-k="9">9</button>
+              <button class="pad-key pad-fn" type="button" data-k="C" aria-label="Clear">C</button>
+              <button class="pad-key" type="button" data-k="0">0</button>
+              <button class="pad-key pad-fn" type="button" data-k="OK" disabled aria-label="Unlock, turned off for now">OK</button>
+              </div>
+            </div>
+            <span class="door door-l" aria-hidden="true"></span>
+            <span class="door door-r" aria-hidden="true"></span>
           </div>
-          <div class="key-wrap">
-            <button class="key" id="next" type="button" aria-label="Next disc"><i class="ph ph-caret-right" aria-hidden="true"></i></button>
-            <span class="engrave" aria-hidden="true">Next</span>
-          </div>
-          <div class="key-wrap">
-            <button class="key key-play" id="play" type="button"><i class="ph ph-play" aria-hidden="true"></i></button>
-            <span class="engrave" id="play-label" aria-hidden="true">Play</span>
+
+          <div class="keys">
+            <div class="key-wrap">
+              <button class="key" id="prev" type="button" aria-label="Previous disc"><i class="ph ph-caret-left" aria-hidden="true"></i></button>
+              <span class="engrave" aria-hidden="true">Prev</span>
+            </div>
+            <div class="key-wrap">
+              <button class="key" id="next" type="button" aria-label="Next disc"><i class="ph ph-caret-right" aria-hidden="true"></i></button>
+              <span class="engrave" aria-hidden="true">Next</span>
+            </div>
+            <div class="key-wrap">
+              <button class="key key-play" id="play" type="button"><i class="ph ph-play" aria-hidden="true"></i></button>
+              <span class="sticker" id="sticker" aria-hidden="true"><i class="ph-fill ph-lock-simple"></i></span>
+              <span class="engrave" id="play-label" aria-hidden="true">Play</span>
+            </div>
           </div>
         </div>
       </section>
@@ -68,20 +94,6 @@
       <p>RAS G9. <span class="hint-desk">Scroll, use the arrow keys, or press 1 to 6 to change disc.</span><span class="hint-touch">Swipe the discs or tap one to change.</span></p>
     </footer>
   </div>
-
-  <dialog class="lockbox" id="lockbox" aria-labelledby="lock-title">
-    <form method="dialog" id="lock-form">
-      <div class="lock-vfd" aria-hidden="true"><span id="lock-disc">Disc 01</span><span>Locked</span></div>
-      <h2 id="lock-title">Enter password</h2>
-      <label class="lock-label" for="lock-input">Password</label>
-      <input class="lock-input" id="lock-input" type="password" autocomplete="off" spellcheck="false" aria-describedby="lock-note">
-      <p class="lock-note" id="lock-note">Unlocking is turned off for now.</p>
-      <div class="lock-actions">
-        <button class="pill" type="button" id="lock-cancel">Cancel</button>
-        <button class="pill pill-amber" type="submit" value="unlock" disabled>Unlock</button>
-      </div>
-    </form>
-  </dialog>
 
   <div class="vignette" aria-hidden="true"></div>
   <canvas class="film" id="film" aria-hidden="true"></canvas>
