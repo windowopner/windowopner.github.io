@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sabu</title>
+  <meta name="description" content="Sabu builds web apps, Mac tools, and small graphics experiments.">
+  <meta name="color-scheme" content="light dark">
+  <meta property="og:title" content="Sabu">
+  <meta property="og:description" content="Web apps, Mac tools, and small graphics experiments.">
+  <meta property="og:image" content="https://windowopner.github.io/assets/folio.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="wordmark" href="#top">Sabu</a>
+      <nav aria-label="Primary">
+        <a href="#work">Work</a>
+        <a href="#about">About</a>
+        <a href="https://github.com/windowopner" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <h1>I build the things I want to use.</h1>
+        <p class="lede">Student developer making web apps, Mac tools, and small graphics experiments. Mostly for myself, sometimes for others.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#work">See work</a>
+          <a class="btn btn-ghost" href="https://github.com/windowopner" target="_blank" rel="noopener">GitHub</a>
+        </div>
+      </div>
+      <figure class="hero-visual">
+        <div class="ripple" id="ripple" role="img" aria-label="Interactive water ripple surface that reacts to the cursor">
+          <canvas id="ripple-canvas"></canvas>
+        </div>
+        <figcaption>Move your cursor over it, or tap. This is WebGL Ripple, one of my experiments.</figcaption>
+      </figure>
+    </section>
+
+    <section class="work wrap" id="work" aria-labelledby="work-title">
+      <h2 id="work-title">Selected work</h2>
+
+      <div class="bento">
+        <article class="cell cell-studyos reveal">
+          <div class="cell-body">
+            <h3>StudyOS</h3>
+            <p>One place for a student's week: assignments, notes, flashcards, a to-do list, and an AI tutor.</p>
+            <ul class="chips" aria-label="Features">
+              <li>Assignments</li><li>Notes</li><li>Flashcards</li><li>AI tutor</li><li>Community</li>
+            </ul>
+          </div>
+          <p class="stack">Next.js, Supabase, Tailwind</p>
+        </article>
+
+        <article class="cell cell-undertone reveal">
+          <div class="cell-body">
+            <h3>Undertone</h3>
+            <p>A macOS desktop background that moves with whatever music is playing, built on system audio capture.</p>
+          </div>
+          <p class="stack">Swift, macOS</p>
+        </article>
+
+        <article class="cell cell-shot reveal">
+          <a class="shot" href="https://project-km7wz.vercel.app" target="_blank" rel="noopener">
+            <img src="assets/folio.jpg" width="1440" height="900" loading="lazy" alt="Folio landing page with the headline Write for the world. Or just for you.">
+          </a>
+          <div class="cell-foot">
+            <div>
+              <h3>Folio</h3>
+              <p>A place to publish letters, essays, and poems, shared by link or @handle.</p>
+            </div>
+            <a class="link" href="https://project-km7wz.vercel.app" target="_blank" rel="noopener">Visit site</a>
+          </div>
+        </article>
+
+        <article class="cell cell-shot reveal">
+          <a class="shot" href="https://project-4g5vb.vercel.app" target="_blank" rel="noopener">
+            <img src="assets/ynot.jpg" width="1440" height="900" loading="lazy" alt="Y-Not Saloon website hero in black and gold">
+          </a>
+          <div class="cell-foot">
+            <div>
+              <h3>Y-Not Saloon</h3>
+              <p>Website for a hair salon, in English, Malay, and Chinese.</p>
+            </div>
+            <a class="link" href="https://project-4g5vb.vercel.app" target="_blank" rel="noopener">Visit site</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="smaller wrap" aria-labelledby="smaller-title">
+      <h2 id="smaller-title">Smaller things</h2>
+      <div class="rows">
+        <article class="row reveal">
+          <h3>Google Workspace connector for Claude</h3>
+          <p>An MCP server that lets Claude read my Classroom assignments and create Docs, Slides, and Drive files. Handles its own OAuth.</p>
+          <p class="stack">Python, FastAPI</p>
+        </article>
+        <article class="row reveal">
+          <h3>WebGL Ripple</h3>
+          <p>A water surface simulated on the GPU with the 2D wave equation. It is the panel at the top of this page.</p>
+          <p class="stack">Three.js, GLSL</p>
+        </article>
+        <article class="row reveal">
+          <h3><a href="https://windowopner.github.io/Archive-for-Web-projects/" target="_blank" rel="noopener">Studio Archive</a></h3>
+          <p>An experimental gallery page for collecting my web projects in one place.</p>
+          <p class="stack">HTML, CSS, JavaScript</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="about wrap" id="about" aria-labelledby="about-title">
+      <h2 id="about-title" class="visually-hidden">About</h2>
+      <p class="statement reveal">I'm Sabu. I build software in my spare time, usually because I wanted a tool that didn't exist yet. Right now I'm working on StudyOS and Undertone.</p>
+      <dl class="facts reveal">
+        <div><dt>Languages</dt><dd>TypeScript, Python, Swift</dd></div>
+        <div><dt>Often use</dt><dd>Next.js, Supabase, Three.js</dd></div>
+        <div><dt>Find me</dt><dd><a href="https://github.com/windowopner" target="_blank" rel="noopener">github.com/windowopner</a></dd></div>
+      </dl>
+    </section>
+  </main>
+
+  <footer class="footer wrap">
+    <span>Sabu, 2026</span>
+    <a href="#top">Back to top</a>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+  <script src="ripple.js" defer></script>
+  <script src="main.js" defer></script>
+</body>
+</html>
