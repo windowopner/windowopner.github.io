@@ -15,15 +15,25 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <canvas class="sky" id="sky" aria-hidden="true"></canvas>
   <div class="room">
     <header class="top">
       <a class="mark" href="./">Sabu</a>
+      <div class="theme-switch" id="theme-switch" role="radiogroup" aria-label="Theme" style="--n: 2">
+        <input type="radio" name="theme" id="theme-room" value="room" checked>
+        <label for="theme-room">Room</label>
+        <input type="radio" name="theme" id="theme-space" value="space">
+        <label for="theme-space">Space</label>
+        <span class="theme-knob" aria-hidden="true"></span>
+      </div>
       <a class="gh" href="https://github.com/windowopner" target="_blank" rel="noopener"><i class="ph ph-github-logo" aria-hidden="true"></i>GitHub</a>
     </header>
 
     <main class="player" aria-label="Project player">
       <div class="deck" id="deck">
         <div class="glass">
+          <canvas class="orbit orbit-back" id="orbit-back" aria-hidden="true"></canvas>
+          <canvas class="orbit orbit-front" id="orbit-front" aria-hidden="true"></canvas>
           <ol class="discs" id="discs" aria-label="Projects"></ol>
           <div class="clamp" id="clamp" aria-hidden="true"><span class="arm"></span><span class="puck"></span></div>
         </div>
@@ -113,6 +123,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
   <script src="icons.js" defer></script>
   <script src="film.js" defer></script>
+  <script src="orbit.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>

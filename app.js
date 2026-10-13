@@ -206,6 +206,7 @@ function select(i) {
   $("stack").textContent = d.stack;
 
   closePad();
+  if (window.Orbit) Orbit.focus(index);
   play.classList.toggle("locked", Boolean(d.locked));
   if (!d.locked) play.removeAttribute("aria-expanded");
   if (d.url) {
@@ -295,6 +296,7 @@ $("next").addEventListener("click", () => select(index + 1));
 // Keyboard: arrows step, 1-6 jump straight to a disc, Enter plays.
 window.addEventListener("keydown", (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target instanceof HTMLInputElement && e.target.name === "theme") return; // arrows move the theme switch
   // While the keypad is open, number keys type into it instead of changing disc.
   if (controls.classList.contains("open")) {
     if (/^\d$/.test(e.key)) { pressPad(e.key); flashKey(e.key); return; }
@@ -354,5 +356,37 @@ $("stamp").textContent = `'${String(now.getFullYear()).slice(2)} ${pad(now.getMo
 
 // Canvas text needs the web fonts, so wait for them before the first draw.
 document.fonts.ready.then(() => select(index));
+// Themes. The choice is remembered per browser when storage is available.
+const THEMES = ["room", "space"];
+const themeSwitch = $("theme-switch");
+const room = document.querySelector(".room");
+
+function applyTheme(name) {
+  const theme = THEMES.includes(name) ? name : "room";
+  document.documentElement.dataset.theme = theme;
+  themeSwitch.style.setProperty("--i", THEMES.indexOf(theme));
+  $(`theme-${theme}`).checked = true;
+  closePad();
+  if (theme === "space" && window.Orbit) Orbit.start(index);
+  else if (window.Orbit) Orbit.stop();
+  moveClamp();
+  try { localStorage.setItem("theme", theme); } catch (err) { /* storage blocked */ }
+}
+
+themeSwitch.addEventListener("change", (e) => {
+  const next = e.target.value;
+  if (reducedMotion) { applyTheme(next); return; }
+  // A quick cut to black between themes, like changing reels.
+  room.classList.add("cut");
+  setTimeout(() => {
+    applyTheme(next);
+    room.classList.remove("cut");
+  }, 180);
+});
+
+let savedTheme = "room";
+try { savedTheme = localStorage.getItem("theme") || "room"; } catch (err) { /* storage blocked */ }
+
 select(0);
+applyTheme(savedTheme);
 if (hasIcons) Icons.start({ reducedMotion });

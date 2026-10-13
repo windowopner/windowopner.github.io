@@ -65,10 +65,70 @@ button { font: inherit; color: inherit; }
 
 .top {
   height: 64px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
 }
+
+.top .gh { justify-self: end; }
+
+/* Theme slide switch: a recessed track with an aluminium knob that snaps between detents. */
+.theme-switch {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  width: calc(var(--n) * 78px);
+  height: 30px;
+  padding: 3px;
+  border-radius: 999px;
+  background: #0b0705;
+  box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.9), 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+.theme-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.theme-switch label {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-family: "Silkscreen", monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  transition: color 0.3s;
+}
+
+.theme-switch input:checked + label { color: #3b342d; }
+
+.theme-switch input:focus-visible + label { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 999px; }
+
+.theme-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--n));
+  height: calc(100% - 6px);
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.08) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #ebe6de, #bdb7ae);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.6), inset 0 1px 0 rgb(255 255 255 / 0.7);
+  transform: translateX(calc(var(--i, 0) * 100%));
+  transition: transform 0.35s var(--ease);
+}
+
+.room { transition: opacity 0.18s; }
+
+.room.cut { opacity: 0; }
+
+.sky, .orbit { display: none; image-rendering: pixelated; pointer-events: none; }
 
 .mark {
   font-family: "Silkscreen", monospace;
@@ -306,8 +366,7 @@ button { font: inherit; color: inherit; }
   aspect-ratio: 1;
   border-radius: 6px;
   overflow: hidden;
-  background:
-    radial-gradient(75% 75% at 40% 30%, #6b4a33, #3a271b 60%, #22160f);
+  background: var(--stage-bg, radial-gradient(75% 75% at 40% 30%, #6b4a33, #3a271b 60%, #22160f));
   box-shadow: inset 0 2px 10px rgb(0 0 0 / 0.75), inset 0 0 0 1px rgb(0 0 0 / 0.5);
 }
 
@@ -374,7 +433,7 @@ button { font: inherit; color: inherit; }
 
 .desc {
   margin: 12px 2px 0;
-  color: #2c241d;
+  color: var(--panel-text, #2c241d);
   max-width: 58ch;
   font-size: 15px;
 }
@@ -586,7 +645,7 @@ button { font: inherit; color: inherit; }
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--engrave);
-  text-shadow: 0 1px 0 rgb(255 255 255 / 0.5);
+  text-shadow: var(--engrave-shadow, 0 1px 0 rgb(255 255 255 / 0.5));
 }
 
 /* Film overlay */
@@ -646,4 +705,88 @@ button { font: inherit; color: inherit; }
   .vfd-row { gap: 12px; }
   .slots { gap: 6px; }
   .stamp { font-size: 20px; right: 14px; bottom: 10px; }
+}
+
+/* ---------- Space theme ---------- */
+:root[data-theme="space"] {
+  --room: #05060b;
+  --text-dim: #9b97a3;
+  --alu-1: #3d404b;
+  --alu-2: #24272f;
+  --alu-3: #2d3039;
+  --alu-4: #1a1c22;
+  --engrave: #8f8b93;
+  --engrave-shadow: none;
+  --panel-text: #ddd3c4;
+  --stage-bg: radial-gradient(75% 75% at 40% 30%, #2b3550, #141a2a 60%, #0a0d16);
+}
+
+[data-theme="space"] .sky {
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+[data-theme="space"] .room {
+  position: relative;
+  z-index: 1;
+  background:
+    radial-gradient(55% 45% at 78% 18%, rgb(46 78 120 / 0.22), transparent 70%),
+    radial-gradient(45% 40% at 15% 85%, rgb(150 70 45 / 0.14), transparent 70%);
+}
+
+[data-theme="space"] .deck,
+[data-theme="space"] .glass {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+[data-theme="space"] .glass {
+  height: clamp(260px, 44dvh, 430px);
+  overflow: visible;
+}
+
+[data-theme="space"] .glass::after,
+[data-theme="space"] .nameplate,
+[data-theme="space"] .clamp { display: none; }
+
+[data-theme="space"] .orbit {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+[data-theme="space"] .orbit-back { z-index: 0; }
+
+[data-theme="space"] .orbit-front { z-index: 5; }
+
+[data-theme="space"] .discs { display: block; position: absolute; inset: 0; }
+
+[data-theme="space"] .discs li {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: clamp(84px, 12vw, 150px);
+  will-change: transform;
+}
+
+[data-theme="space"] .disc { width: 100%; }
+
+[data-theme="space"] .console {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    inset 0 -1px 0 rgb(0 0 0 / 0.4),
+    0 30px 60px -20px rgb(0 0 0 / 0.9);
+}
+
+[data-theme="space"] .theme-switch { background: #020306; }
+
+@media (max-width: 599px) {
+  [data-theme="space"] .glass { height: 250px; }
 }
