@@ -1,10 +1,20 @@
 // Space theme: the six discs ride a tilted ring around a pixel planet.
-// Selecting a disc turns the ring until that disc sits at the front.
+// The planet hangs off the left edge of the screen and the ring sweeps across it,
+// so only some discs are in frame at once. Selecting a disc turns the ring until
+// that disc reaches the front slot, low and just left of centre.
 // Planet, ring dust, and stars are drawn at a third of the size and scaled up pixelated.
 window.Orbit = (() => {
   const TAU = Math.PI * 2;
   const STEP = TAU / 6;
-  const FRONT = Math.PI / 2; // angle where a disc is nearest the viewer
+  const FRONT = (62 * Math.PI) / 180; // ring angle of the selected slot
+
+  // Composition, as fractions of the stage: planet off the left edge, a wide ring tilted up to the right.
+  const PLANET_X = 0.045; // of viewport width
+  const PLANET_Y = 0.52;  // of stage height
+  const PLANET_R = 0.62;  // of stage height
+  const RING_R = 0.86;    // of viewport width
+  const RING_FLAT = 0.14; // ring height as a share of its width
+  const RING_TILT = (-4 * Math.PI) / 180;
   const SCALE = 3;
   const DRAW_MS = 1000 / 15;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -15,7 +25,12 @@ window.Orbit = (() => {
   let ring = FRONT;
   let target = FRONT;
   let lastDraw = 0;
-  let W = 0, H = 0, CX = 0, CY = 0, R = 0, RY = 0;
+  // Positions are worked out across the whole page ("band": full width, full height),
+  // so the planet can run off the screen edge and sit behind the header and console.
+  // Disc positions are shifted back into the stage's own coordinates.
+  let BW = 0, BH = 0, H = 0, bandLeft = 0, bandTop = 0, CX = 0, CY = 0, R = 0, RY = 0, PR = 0;
+  const COS_T = Math.cos(RING_TILT);
+  const SIN_T = Math.sin(RING_TILT);
   const dust = [];
   let stars = [];
 
@@ -33,7 +48,7 @@ window.Orbit = (() => {
   const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
   const BANDS = ["#b8492f", "#e3a35c", "#efd9b4", "#8f5136"].map(hex);
   const NIGHT = hex("#140b08");
-  const LIGHT = (() => { const l = [-0.55, -0.45, 0.7]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
+  const LIGHT = (() => { const l = [0.62, -0.42, 0.66]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
   const DUST_COLORS = ["255, 226, 184", "227, 163, 92", "200, 120, 80", "240, 236, 224"];
 
   function init() {
@@ -47,14 +62,14 @@ window.Orbit = (() => {
     sctx = sky.getContext("2d");
 
     const r = rng(7);
-    // Ring dust in a few bands with a gap, like a gas giant's rings.
-    for (let k = 0; k < 700; k++) {
-      let rad = 0.7 + r() * 0.55;
-      if (rad > 0.92 && rad < 0.98) rad += 0.07;
-      dust.push({ a: r() * TAU, rad, c: DUST_COLORS[Math.floor(r() * DUST_COLORS.length)], size: r() < 0.12 ? 2 : 1, alpha: 0.5 + r() * 0.5 });
+    // Ring dust: a dense main band around the disc track, a gap, and a faint inner band.
+    for (let k = 0; k < 1100; k++) {
+      const inner = r() < 0.22;
+      const rad = inner ? 0.8 + r() * 0.06 : 0.92 + Math.pow(r(), 1.6) * 0.16 * (r() < 0.5 ? 1 : -0.6);
+      dust.push({ a: r() * TAU, rad, c: DUST_COLORS[Math.floor(r() * DUST_COLORS.length)], size: r() < 0.1 ? 2 : 1, alpha: inner ? 0.25 + r() * 0.3 : 0.45 + r() * 0.55 });
     }
     // The disc track itself, as an evenly dotted line.
-    for (let k = 0; k < 120; k++) dust.push({ a: (k / 120) * TAU, rad: 1, c: DUST_COLORS[0], size: 1, alpha: 0.6 });
+    for (let k = 0; k < 220; k++) dust.push({ a: (k / 220) * TAU, rad: 1, c: DUST_COLORS[0], size: 1, alpha: 0.7 });
 
     new ResizeObserver(() => { if (running) measure(); }).observe(glass);
     window.addEventListener("resize", () => { if (running) measure(); }, { passive: true });
@@ -62,13 +77,24 @@ window.Orbit = (() => {
 
   function measure() {
     const rect = glass.getBoundingClientRect();
-    W = rect.width;
+    BW = document.documentElement.clientWidth;
     H = rect.height;
-    CX = W / 2;
-    CY = H * 0.5;
-    R = Math.min(W * 0.43, H * 1.2);
-    RY = R * 0.26;
-    [back, front].forEach((c) => { c.width = Math.max(1, Math.ceil(W / SCALE)); c.height = Math.max(1, Math.ceil(H / SCALE)); });
+    bandLeft = rect.left;
+    bandTop = rect.top + window.scrollY;
+    BH = Math.max(document.documentElement.scrollHeight, window.innerHeight);
+    CX = BW * PLANET_X;
+    CY = bandTop + H * PLANET_Y;
+    PR = Math.min(H * PLANET_R, BW * 0.32);
+    R = BW * RING_R;
+    RY = R * RING_FLAT;
+    [back, front].forEach((c) => {
+      c.width = Math.max(1, Math.ceil(BW / SCALE));
+      c.height = Math.max(1, Math.ceil(BH / SCALE));
+      c.style.left = `${-bandLeft}px`;
+      c.style.top = `${-bandTop}px`;
+      c.style.width = `${BW}px`;
+      c.style.height = `${BH}px`;
+    });
 
     sky.width = Math.max(1, Math.ceil(window.innerWidth / SCALE));
     sky.height = Math.max(1, Math.ceil(window.innerHeight / SCALE));
@@ -92,13 +118,21 @@ window.Orbit = (() => {
     if (instant || reduced) ring = target;
   }
 
+  // A point on the tilted ring, in band coordinates.
+  function ringPoint(ang, scale = 1) {
+    const lx = Math.cos(ang) * R * scale;
+    const ly = Math.sin(ang) * RY * scale;
+    return [CX + lx * COS_T - ly * SIN_T, CY + lx * SIN_T + ly * COS_T];
+  }
+
   function layout(a) {
     items.forEach((li, i) => {
       const ang = a + i * STEP;
       const sn = Math.sin(ang);
       const depth = (sn + 1) / 2;
-      const x = CX + Math.cos(ang) * R;
-      const y = CY + sn * RY;
+      const [bx, by] = ringPoint(ang);
+      const x = bx - bandLeft;
+      const y = by - bandTop;
       const s = 0.46 + 0.54 * depth;
       li.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%) scale(${s.toFixed(3)})`;
       // Back half goes under the planet canvas (z 5), front half over it.
@@ -108,7 +142,7 @@ window.Orbit = (() => {
   }
 
   function drawPlanet(t) {
-    const pr = Math.max(4, Math.round((R * 0.34) / SCALE));
+    const pr = Math.max(4, Math.round(PR / SCALE));
     const size = pr * 2 + 1;
     const img = fctx.createImageData(size, size);
     const d = img.data;
@@ -143,8 +177,9 @@ window.Orbit = (() => {
       const phi = p.a + a + spin;
       const sn = Math.sin(phi);
       const ctx = sn < 0 ? bctx : fctx;
-      const x = Math.floor((CX + Math.cos(phi) * R * p.rad) / SCALE);
-      const y = Math.floor((CY + sn * RY * p.rad) / SCALE);
+      const [bx, by] = ringPoint(phi, p.rad);
+      const x = Math.floor(bx / SCALE);
+      const y = Math.floor(by / SCALE);
       ctx.fillStyle = `rgba(${p.c}, ${(p.alpha * (0.55 + 0.45 * (sn + 1) / 2)).toFixed(2)})`;
       ctx.fillRect(x, y, p.size, p.size);
     });

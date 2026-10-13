@@ -384,8 +384,11 @@ themeSwitch.addEventListener("change", (e) => {
   }, 180);
 });
 
-let savedTheme = "room";
-try { savedTheme = localStorage.getItem("theme") || "room"; } catch (err) { /* storage blocked */ }
+// ?theme=space in the address wins, so a theme can be linked directly.
+let savedTheme = new URLSearchParams(location.search).get("theme");
+if (!savedTheme) {
+  try { savedTheme = localStorage.getItem("theme") || "room"; } catch (err) { savedTheme = "room"; }
+}
 
 select(0);
 applyTheme(savedTheme);

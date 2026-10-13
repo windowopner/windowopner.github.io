@@ -746,9 +746,12 @@ button { font: inherit; color: inherit; }
 }
 
 [data-theme="space"] .glass {
-  height: clamp(260px, 44dvh, 430px);
+  height: clamp(280px, 48dvh, 460px);
   overflow: visible;
 }
+
+/* Discs and the planet run off the screen edges on purpose; never let that scroll. */
+[data-theme="space"] body { overflow-x: clip; }
 
 [data-theme="space"] .glass::after,
 [data-theme="space"] .nameplate,
@@ -757,9 +760,14 @@ button { font: inherit; color: inherit; }
 [data-theme="space"] .orbit {
   display: block;
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+}
+
+/* The planet spills behind the header and console, so lift those above the orbit layers. */
+[data-theme="space"] .top,
+[data-theme="space"] .console,
+[data-theme="space"] .bottom {
+  position: relative;
+  z-index: 20;
 }
 
 [data-theme="space"] .orbit-back { z-index: 0; }
