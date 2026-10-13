@@ -4,7 +4,7 @@ My portfolio, served by GitHub Pages at https://windowopner.github.io.
 
 Six projects loaded into a six-disc player. Scroll, use the arrow keys, press 1 to 6, or swipe to change disc. Each project has a small pixel 3D icon (Three.js r128, rendered at low resolution and scaled up), and a film grain layer sits on top of everything.
 
-Two themes, picked with the slide switch at the top: Room (the player on a shelf) and Space (the discs ride a planet's ring). The choice is remembered per browser.
+Two themes, picked with the slide switch at the top: Room (the player on a shelf, with a clamp that lifts, travels, and sets down) and Space (the discs ride a planet's ring, which you can also grab and spin). The choice is remembered per browser.
 
 Plain HTML, CSS, and JavaScript with no build step.
 

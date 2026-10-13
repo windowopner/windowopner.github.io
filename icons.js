@@ -296,7 +296,7 @@ window.Icons = (() => {
     switchedAt = performance.now();
     // Draw one frame right away so the stage is never empty, even in a background tab.
     current.update(1.2);
-    current.scale.setScalar(1);
+    current.scale.setScalar(0.7);
     renderer.render(scene, camera);
   }
 
@@ -309,10 +309,10 @@ window.Icons = (() => {
     last = now;
     const t = still ? 1.2 : Math.floor(now / (1000 / FPS)) / FPS;
     current.update(t);
-    // Pop in after a switch: overshoot then settle.
-    const k = Math.min((now - switchedAt) / 350, 1);
-    const pop = k < 1 ? 1 + Math.sin(k * Math.PI) * 0.25 - (1 - k) * 0.6 : 1;
-    current.scale.setScalar(Math.max(pop, 0.05));
+    // Pop in after a switch: a damped spring from 70% up to full size.
+    const k = Math.min((now - switchedAt) / 600, 1);
+    const pop = k < 1 ? 1 - 0.3 * Math.exp(-6 * k) * Math.cos(k * Math.PI * 3) : 1;
+    current.scale.setScalar(pop);
     renderer.render(scene, camera);
   }
 

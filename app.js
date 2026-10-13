@@ -115,6 +115,44 @@ function moveClamp() {
   clamp.style.setProperty("--disc-now", `${b.width}px`);
 }
 
+// Room theme: the clamp lifts off the disc, slides along the rail, then sets down.
+// Rapid changes keep it in the air until the last one lands.
+let landTimer = 0;
+let clampX = null;
+function travelClamp() {
+  const before = clampX;
+  moveClamp();
+  clampX = clamp.style.getPropertyValue("--x");
+  if (reducedMotion || before === null || before === clampX) return;
+  clamp.classList.add("lifted");
+  clearTimeout(landTimer);
+  landTimer = setTimeout(() => clamp.classList.remove("lifted"), 860);
+}
+
+// Disc spin with inertia: the selected disc spins up once it is clamped (or straight
+// away in space), and a disc that loses focus coasts to a stop instead of snapping back.
+const faces = discButtons.map((b) => b.querySelector(".disc-face"));
+const spins = DISCS.map(() => ({ angle: 0, speed: 0 }));
+const SPIN_SPEED = 140; // degrees per second
+let spinLast = 0;
+function spinLoop(now) {
+  requestAnimationFrame(spinLoop);
+  const dt = Math.min(0.05, (now - (spinLast || now)) / 1000);
+  spinLast = now;
+  if (reducedMotion || document.hidden) return;
+  const held = document.documentElement.dataset.theme !== "space" && clamp.classList.contains("lifted");
+  spins.forEach((s, i) => {
+    const goal = i === index && !held ? SPIN_SPEED : 0;
+    if (s.speed === 0 && goal === 0) return;
+    const rate = goal > s.speed ? 1.4 : 0.8; // spin up quicker than it winds down
+    s.speed += (goal - s.speed) * Math.min(1, dt * rate);
+    if (goal === 0 && s.speed < 1) s.speed = 0;
+    s.angle = (s.angle + s.speed * dt) % 360;
+    faces[i].style.transform = `rotate(${s.angle.toFixed(2)}deg)`;
+  });
+}
+requestAnimationFrame(spinLoop);
+
 // The display scrambles briefly before settling, like a VFD redrawing.
 const GLYPHS = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789#*+";
 let scrambleTimer = 0;
@@ -191,7 +229,7 @@ function select(i) {
 
   discButtons.forEach((b, k) => b.setAttribute("aria-current", k === index ? "true" : "false"));
   [...slots.children].forEach((s, k) => s.classList.toggle("on", k === index));
-  moveClamp();
+  travelClamp();
 
   clearTimeout(scrambleTimer);
   $("track").textContent = pad(index + 1);
@@ -310,22 +348,39 @@ window.addEventListener("keydown", (e) => {
   else if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement)) openCurrent();
 });
 
-// Wheel steps one disc per gesture on screens where the page itself does not scroll.
+// Wheel: one disc per gesture on screens where the page itself does not scroll.
+// A trackpad flick keeps sending fading inertial events for a second or so; those
+// are swallowed. A new push shows up as deltas climbing again after they had
+// clearly faded (or as a reversal),
+// and each mouse-wheel notch arrives after a pause, so both count as new gestures.
 const fixedLayout = window.matchMedia("(min-width: 900px) and (min-height: 700px)");
 let wheelSum = 0;
-let wheelAt = 0;
+let wheelLocked = false;
+let wheelPeak = 0;   // biggest delta since the last step
+let wheelTrough = 0; // smallest delta after that peak
 let wheelIdle = 0;
 window.addEventListener("wheel", (e) => {
   if (!fixedLayout.matches || controls.classList.contains("open")) return;
   e.preventDefault();
-  wheelSum += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+  const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+  const size = Math.abs(delta);
   clearTimeout(wheelIdle);
-  wheelIdle = setTimeout(() => { wheelSum = 0; }, 180);
-  const now = performance.now();
-  if (Math.abs(wheelSum) > 40 && now - wheelAt > 300) {
+  wheelIdle = setTimeout(() => { wheelLocked = false; wheelSum = 0; }, 140);
+  if (wheelLocked) {
+    if (size > wheelPeak) { wheelPeak = size; wheelTrough = size; }
+    else wheelTrough = Math.min(wheelTrough, size);
+    const reversed = Math.sign(delta) !== Math.sign(wheelSum) && size > 4;
+    const faded = wheelTrough < wheelPeak * 0.5;
+    const freshPush = faded && size > 12 && size > wheelTrough * 2.5;
+    if (reversed || freshPush) { wheelLocked = false; wheelSum = 0; }
+  }
+  if (wheelLocked) return;
+  wheelSum += delta;
+  if (Math.abs(wheelSum) > 24) {
     select(index + Math.sign(wheelSum));
-    wheelSum = 0;
-    wheelAt = now;
+    wheelLocked = true;
+    wheelPeak = wheelTrough = size;
+    wheelSum = Math.sign(wheelSum) * 0.001;
   }
 }, { passive: false });
 
@@ -334,13 +389,13 @@ let swipeX = null;
 const deck = $("deck");
 deck.addEventListener("pointerdown", (e) => { swipeX = e.clientX; });
 deck.addEventListener("pointerup", (e) => {
-  if (swipeX === null) return;
+  if (swipeX === null || document.documentElement.dataset.theme === "space") { swipeX = null; return; }
   const dx = e.clientX - swipeX;
   swipeX = null;
   if (Math.abs(dx) > 50) select(index + (dx < 0 ? 1 : -1));
 });
 
-new ResizeObserver(moveClamp).observe(glass);
+new ResizeObserver(() => { moveClamp(); clampX = clamp.style.getPropertyValue("--x"); }).observe(glass);
 
 // Re-wrap the mosaic when the description column changes width.
 let wrapWidth = 0;
@@ -370,18 +425,20 @@ function applyTheme(name) {
   if (theme === "space" && window.Orbit) Orbit.start(index);
   else if (window.Orbit) Orbit.stop();
   moveClamp();
+  clampX = clamp.style.getPropertyValue("--x");
   try { localStorage.setItem("theme", theme); } catch (err) { /* storage blocked */ }
 }
 
 themeSwitch.addEventListener("change", (e) => {
   const next = e.target.value;
   if (reducedMotion) { applyTheme(next); return; }
-  // A quick cut to black between themes, like changing reels.
-  room.classList.add("cut");
+  // Fade to black, swap reels, fade back up.
+  const root = document.documentElement;
+  root.classList.add("cut");
   setTimeout(() => {
     applyTheme(next);
-    room.classList.remove("cut");
-  }, 180);
+    requestAnimationFrame(() => root.classList.remove("cut"));
+  }, 320);
 });
 
 // ?theme=space in the address wins, so a theme can be linked directly.
@@ -389,6 +446,9 @@ let savedTheme = new URLSearchParams(location.search).get("theme");
 if (!savedTheme) {
   try { savedTheme = localStorage.getItem("theme") || "room"; } catch (err) { savedTheme = "room"; }
 }
+
+// Dragging the ring in space hands the disc it settles on back to the player.
+if (window.Orbit) Orbit.onSelect = (i) => { if (i !== index) select(i); };
 
 select(0);
 applyTheme(savedTheme);

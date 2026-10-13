@@ -124,9 +124,12 @@ button { font: inherit; color: inherit; }
   transition: transform 0.35s var(--ease);
 }
 
-.room { transition: opacity 0.18s; }
+.room, .sky { transition: opacity 0.42s cubic-bezier(0.2, 0, 0, 1); }
 
-.room.cut { opacity: 0; }
+:root.cut .room, :root.cut .sky {
+  opacity: 0;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 1, 1);
+}
 
 .sky, .orbit { display: none; image-rendering: pixelated; pointer-events: none; }
 
@@ -297,11 +300,7 @@ button { font: inherit; color: inherit; }
   box-shadow: 0 0 0 3px rgb(255 255 255 / 0.25);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .disc[aria-current="true"] .disc-face { animation: spin 2.6s linear infinite; }
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
+.disc-face { will-change: transform; }
 
 /* The clamp slides along the top rail to the selected disc. */
 .clamp {
@@ -311,15 +310,27 @@ button { font: inherit; color: inherit; }
   height: 100%;
   width: 0;
   transform: translateX(var(--x, 0px));
-  transition: transform 0.75s var(--ease);
+  transition: transform 0.62s cubic-bezier(0.5, 0, 0.2, 1) 0.18s;
   pointer-events: none;
   z-index: 1;
 }
 
+/* Lift, travel, set down: the head rises before the slide and drops after it. */
+.head {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.22s cubic-bezier(0.3, 0, 0.2, 1.4);
+}
+
+.clamp.lifted .head {
+  transform: translateY(-26px);
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.6, 1);
+}
+
 .arm {
   position: absolute;
-  top: 0;
-  height: 50%;
+  top: -40px;
+  height: calc(50% + 40px);
   left: -5px;
   width: 10px;
   background: linear-gradient(90deg, var(--alu-4), var(--alu-1) 45%, var(--alu-2));
@@ -633,6 +644,7 @@ button { font: inherit; color: inherit; }
 .controls.open .door-r { transform: translateX(101%); }
 
 @media (prefers-reduced-motion: reduce) {
+  .clamp, .head, .clamp.lifted .head, .room, .sky,
   .keys, .keypad, .door,
   .controls.open .keys, .controls.open .keypad, .controls.open .door { transition: none; }
 }
@@ -784,7 +796,31 @@ button { font: inherit; color: inherit; }
   will-change: transform;
 }
 
-[data-theme="space"] .disc { width: 100%; }
+/* Depth shading as an overlay (cheap to animate) instead of a filter. */
+[data-theme="space"] .discs li::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #05060b;
+  opacity: var(--shade, 0);
+  pointer-events: none;
+}
+
+[data-theme="space"] .disc,
+[data-theme="space"] .disc:hover { width: 100%; filter: none; }
+
+[data-theme="space"] .disc[aria-current="true"] { transform: none; }
+
+[data-theme="space"] .glass {
+  touch-action: pan-y;
+  cursor: grab;
+  transform: translate3d(var(--par-x, 0px), var(--par-y, 0px), 0);
+}
+
+[data-theme="space"] .glass.dragging { cursor: grabbing; }
+
+[data-theme="space"] .sky { transform: translate3d(var(--sky-x, 0px), var(--sky-y, 0px), 0) scale(1.02); }
 
 [data-theme="space"] .console {
   box-shadow:

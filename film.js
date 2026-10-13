@@ -10,11 +10,14 @@
   let w = 0;
   let h = 0;
   let grain = [];
+  // Grain tiles are a little larger than the screen and drawn at a random offset each
+  // frame, so the six tiles never read as a repeating loop.
+  const PAD = 24;
 
   function makeGrain() {
     grain = [];
     for (let f = 0; f < 6; f++) {
-      const img = ctx.createImageData(w, h);
+      const img = ctx.createImageData(w + PAD, h + PAD);
       const d = img.data;
       for (let i = 0; i < d.length; i += 4) {
         const r = Math.random();
@@ -44,6 +47,7 @@
   if (reduced) return;
 
   const scratches = [];
+  let flickerLevel = 0;
   let frame = 0;
   let last = 0;
 
@@ -53,10 +57,12 @@
     last = now;
     frame++;
 
-    ctx.putImageData(grain[frame % grain.length], 0, 0);
+    const tile = grain[Math.floor(Math.random() * grain.length)];
+    ctx.putImageData(tile, -Math.floor(Math.random() * PAD), -Math.floor(Math.random() * PAD));
 
-    // Flicker: a faint warm wash that wobbles frame to frame.
-    const flicker = Math.random() < 0.06 ? 0.07 : Math.random() * 0.025;
+    // Flicker: a faint warm wash that drifts rather than jumps.
+    flickerLevel += ((Math.random() < 0.04 ? 0.05 : Math.random() * 0.02) - flickerLevel) * 0.5;
+    const flicker = flickerLevel;
     ctx.fillStyle = `rgba(255, 214, 160, ${flicker})`;
     ctx.fillRect(0, 0, w, h);
 
