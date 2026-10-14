@@ -187,7 +187,9 @@ function turnDial() {
 
 // Called every frame by the 3D view with the carousel's actual position.
 let lastStretch = 0;
-function onFrame(p, speed = 0) {
+function onFrame(p, speed = 0, grip = null) {
+  sound?.mix(p, speed);
+  sound?.grip(grip);
   const ringAngle = -p * STEP;
   dialRing.style.transform = `rotate(${ringAngle}deg)`;
   placePlayhead(p);
@@ -206,8 +208,9 @@ function onFrame(p, speed = 0) {
   }
 }
 
-// A notch passing under the pointer: a short buzz on phones that support it.
-function onDetent() {
+// A notch passing under the pointer: a click, and a short buzz on phones that support it.
+function onDetent(i) {
+  sound?.cue("tick", i);
   if (scrubbing || document.documentElement.classList.contains("is-dragging")) navigator.vibrate?.(6);
   pointer.classList.remove("tap");
   void pointer.getBoundingClientRect();
@@ -225,9 +228,9 @@ const hint = document.querySelector(".hint");
 const hintHTML = hint.innerHTML;
 function onGrab(on) {
   document.documentElement.classList.toggle("is-grabbing", on);
-  hint.textContent = on ? "Turn it, then let go to spin." : "";
+  hint.textContent = on ? (sound?.playing ? "Turn it to scratch. Let go to spin." : "Turn it, then let go to spin.") : "";
   if (!on) hint.innerHTML = hintHTML;
-  if (on) navigator.vibrate?.(12);
+  if (on) { navigator.vibrate?.(12); sound?.cue("grab"); }
 }
 
 // ── Timeline: the discs laid out on a track, with a playhead that follows the carousel.
@@ -425,6 +428,12 @@ function revealWords(el, text) {
   }));
 }
 
+// The front disc reacts, and so does the sound.
+function pulse(kind) {
+  scene?.pulse(kind);
+  sound?.cue(kind);
+}
+
 // ── The sheet on the right ───────────────────────────────────────────
 const action = $("action");
 const actionLabel = $("action-label");
@@ -477,10 +486,10 @@ function activate() {
   const d = DISCS[index];
   if (d.url) {
     // Open straight away (inside the click, so it isn't blocked); the disc flies out as it does.
-    scene?.pulse("open");
+    pulse("open");
     window.open(d.url, "_blank", "noopener");
   } else if (d.locked) {
-    scene?.pulse("seal");
+    pulse("seal");
     openPad();
   }
 }
@@ -521,6 +530,7 @@ function openPad() {
   entry = "";
   showCode();
   keypad.showModal();
+  muffleCheck();
 }
 
 function closePad() {
@@ -574,7 +584,7 @@ async function submitCode() {
       closePad();
       applyUnlock(payload);
       select(index);
-      scene?.pulse("unlock");
+      pulse("unlock");
     }, 420);
   } catch (err) {
     clearInterval(reading);
@@ -584,7 +594,7 @@ async function submitCode() {
     if (failures >= 3) waitUntil = Date.now() + Math.min(30000, 1000 * 2 ** (failures - 3));
     entry = "";
     padStatus("Wrong", "    code");
-    scene?.pulse("deny");
+    pulse("deny");
     keypad.classList.remove("shake");
     void keypad.offsetWidth;
     keypad.classList.add("shake");
@@ -595,6 +605,7 @@ async function submitCode() {
 function pressPad(k) {
   if (busy) return;
   if (k === "OK") { submitCode(); return; }
+  sound?.cue("key", k);
   if (k === "C") entry = "";
   else if (/^\d$/.test(k) && entry.length < MAX_CODE) entry += k;
   showCode();
@@ -613,7 +624,7 @@ $("pad-grid").addEventListener("click", (e) => {
 });
 $("keypad-close").addEventListener("click", closePad);
 // Whichever way the keypad closes (button, Escape, backdrop, unlock), the disc flips back.
-keypad.addEventListener("close", () => scene?.pulse("unseal"));
+keypad.addEventListener("close", () => { scene?.pulse("unseal"); muffleCheck(); });
 keypad.addEventListener("click", (e) => { if (e.target === keypad) closePad(); });
 
 // Already unlocked earlier in this tab: restore quietly.
@@ -640,7 +651,8 @@ function fillInfo() {
     return li;
   }));
 }
-function openInfo() { fillInfo(); info.showModal(); }
+function openInfo() { fillInfo(); info.showModal(); muffleCheck(); }
+info.addEventListener("close", () => muffleCheck());
 $("info-btn").addEventListener("click", openInfo);
 $("info-close").addEventListener("click", () => info.close());
 info.addEventListener("click", (e) => { if (e.target === info) info.close(); });
@@ -657,6 +669,7 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (info.open || document.documentElement.classList.contains("opening")) return;
+  if (e.key === "m" || e.key === "M") { toggleSound(); return; }
   if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); select(index + 1); }
   else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); select(index - 1); }
   else if (/^[1-9]$/.test(e.key) && Number(e.key) <= DISCS.length) select(Number(e.key) - 1);
@@ -697,6 +710,77 @@ window.addEventListener("wheel", (e) => {
     wheelSum = Math.sign(wheelSum) * 0.001;
   }
 }, { passive: false });
+
+// ── Sound: off until asked for. The choice is remembered, and a returning visitor who
+//    left it on hears it from their first click or key (browsers allow nothing sooner). ──
+const soundBtn = $("sound-btn");
+const soundBars = [...soundBtn.querySelectorAll(".eq i")];
+let sound = null;
+let soundLoading = null;
+let soundWanted = false;
+try { soundWanted = localStorage.getItem("sound") === "on"; } catch (err) { /* storage blocked */ }
+
+function showSound(state) {
+  soundBtn.dataset.state = state;
+  soundBtn.setAttribute("aria-pressed", state === "off" ? "false" : "true");
+  soundBtn.querySelector(".sound-label").textContent = state === "off" ? "Sound off" : "Sound on";
+}
+
+function onLevel(level, bars) {
+  scene?.setBeat(level);
+  soundBars.forEach((el, k) => { el.style.transform = `scaleY(${0.18 + bars[k] * 0.82})`; });
+}
+
+function muffleCheck() {
+  sound?.muffle(keypad.open || info.open);
+}
+
+// Runs inside a click or key press: the AudioContext has to be made and resumed right here.
+function startSound() {
+  if (sound) { sound.on(); muffleCheck(); showSound("on"); return; }
+  if (!soundLoading) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC || !window.AudioWorkletNode) { soundUnavailable(); return; }
+    const ctx = new AC({ latencyHint: "interactive" });
+    ctx.resume();
+    soundLoading = import(`./sound.js?v=${VERSION}`)
+      .then(({ createSound }) => createSound(ctx, { first: index, onLevel }))
+      .then((s) => {
+        sound = s;
+        if (soundWanted) { s.on(); muffleCheck(); showSound("on"); }
+      })
+      .catch((err) => { console.warn("Sound unavailable.", err); soundUnavailable(); });
+  }
+  showSound("loading");
+}
+
+function soundUnavailable() {
+  soundWanted = false;
+  showSound("off");
+  soundBtn.disabled = true;
+  soundBtn.title = "Sound isn't available in this browser";
+}
+
+function toggleSound() {
+  if (soundBtn.disabled) return;
+  soundWanted = !soundWanted;
+  try { localStorage.setItem("sound", soundWanted ? "on" : "off"); } catch (err) { /* storage blocked */ }
+  if (soundWanted) startSound();
+  else { sound?.off(); showSound("off"); }
+}
+
+soundBtn.addEventListener("click", toggleSound);
+showSound(soundWanted ? "on" : "off");
+if (soundWanted) {
+  const arm = (e) => {
+    if (soundBtn.contains(e.target)) return; // its own click decides
+    if (e.type === "pointerdown" && e.pointerType !== "mouse") return; // a touch counts from pointerup
+    if (e.type === "keydown" && e.key === "Escape") return; // doesn't count as a gesture
+    ["pointerdown", "pointerup", "keydown"].forEach((t) => window.removeEventListener(t, arm, true));
+    if (soundWanted && !sound && !soundLoading) startSound();
+  };
+  ["pointerdown", "pointerup", "keydown"].forEach((t) => window.addEventListener(t, arm, true));
+}
 
 // ── No WebGL: a flat iridescent disc stands in ───────────────────────
 const fallback = $("fallback-disc");

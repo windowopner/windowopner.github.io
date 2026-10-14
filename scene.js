@@ -8,6 +8,8 @@
 //   opts.label(i, ctx)   draws disc i's label onto a 1024px canvas
 //   opts.onSelect(i)     a disc was chosen by dragging or clicking a neighbour
 //   opts.onActivate()    the front disc was clicked
+//   opts.onFrame(p, speed, grip)  every frame: carousel position, its speed, and the hand's
+//                        spin speed on a held disc in rad/s (null when nothing is held)
 //   opts.holdIntro       wait for intro() before the discs rise into place
 
 import * as THREE from "three";
@@ -101,6 +103,8 @@ const FloorShader = {
     ripple: { value: new THREE.Vector3(0, 0, 99) },
     // Where the pointer meets the floor (xz), and how present it is (0-1).
     pointer: { value: new THREE.Vector3(0, 0, 0) },
+    // The music's low end, 0-1, so the grid breathes with the kick.
+    beat: { value: 0 },
   },
   vertexShader: /* glsl */ `
     uniform mat4 textureMatrix;
@@ -119,6 +123,7 @@ const FloorShader = {
     uniform vec3 ink;
     uniform vec3 ripple;
     uniform vec3 pointer;
+    uniform float beat;
     uniform sampler2D tDiffuse;
     varying vec4 vUv;
     varying vec3 vWorld;
@@ -137,7 +142,7 @@ const FloorShader = {
       float front = ripple.z * 3.4;
       float ring = exp(-pow((r - front) / 0.22, 2.0)) * exp(-ripple.z * 1.6);
       float glow = exp(-pow(length(vWorld.xz - pointer.xy) / 1.1, 2.0)) * pointer.z;
-      float boost = 1.0 + ring * 3.0 + glow * 1.6;
+      float boost = 1.0 + ring * 3.0 + glow * 1.6 + beat * 1.4;
       float line = gridLine(vWorld.xz * 1.6) * 0.11 * fade * boost + ring * 0.05 * fade;
       vec4 mirror = texture2DProj(tDiffuse, vUv);
       float m = mirror.a * 0.26 * fade;
@@ -324,6 +329,8 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
   let rippleT = 99;
   const ripple = floor.material.uniforms.ripple.value;
   const pointerFloor = floor.material.uniforms.pointer.value;
+  const beat = floor.material.uniforms.beat;
+  let beatT = 0;
   // Press and hold the front disc to grab it like a record.
   let holdTimer = 0;
   let grabbed = false;
@@ -343,7 +350,8 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
       const a = Math.min(1, Math.abs(k));
       const e = 1 - (1 - introT) ** 3;
       const front = i === target;
-      const lift = front ? fx.hover * 0.08 + fx.push * 0.12 - fx.press * 0.05 : 0;
+      const thump = reduceMotion ? 0 : beat.value * 0.03; // the front disc rides the kick a little
+      const lift = front ? fx.hover * 0.08 + fx.push * 0.12 - fx.press * 0.05 + thump : 0;
       const z = -Math.abs(k) * 1.15 + (front ? fx.push * 1.1 : 0);
       d.position.set(k * SPACING, -0.04 * k * k + (1 - e) * -1.4 + lift, z);
       const s = (1 - a * 0.3) * (0.82 + 0.18 * e);
@@ -402,6 +410,9 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     fx.wobble = ease(fx.wobble, 0, 3.5, dt);
     fx.press = ease(fx.press, fx.pressT, 12, dt);
     speed = ease(speed, dragging ? dragVel : vel, 10, dt);
+    // A held disc stops when the hand stops, even though no move event says so.
+    if (grabbed && now - grabT > 40) grabVel = ease(grabVel, 0, 16, dt);
+    beat.value = ease(beat.value, beatT, 30, dt);
     rippleT += dt;
     ripple.z = rippleT;
     // One tick each time the carousel passes a disc.
@@ -415,7 +426,7 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     scene.environmentRotation.set(tilt.y * 0.35, tilt.x * 0.9 + envDrift, 0);
     layout(dt, now);
     renderer.render(scene, camera);
-    onFrame?.(pos, speed);
+    onFrame?.(pos, speed, grabbed ? grabVel : null);
     frame = requestAnimationFrame(tick);
   }
   function start() {
@@ -626,6 +637,7 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
       if (kind === "unlock") { fx.flipT = 0; d.userData.spinV = 16; rippleT = 0; }
     },
     intro() { introPlaying = true; },
+    setBeat(v) { beatT = v; },
     dispose() {
       stop();
       ro.disconnect();
