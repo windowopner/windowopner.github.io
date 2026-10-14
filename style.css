@@ -332,6 +332,21 @@ a {
 
 .pointer {
   fill: var(--accent);
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+}
+
+/* The pointer nods each time a disc passes under it. */
+.pointer.tap {
+  animation: pointer-tap 180ms var(--ease);
+}
+
+.is-grabbing .scene {
+  cursor: grabbing;
+}
+
+.dial .tick {
+  transition: none;
 }
 
 .timeline {
@@ -927,6 +942,10 @@ a {
 @keyframes rise {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
+}
+
+@keyframes pointer-tap {
+  40% { transform: translateY(1.6px) scaleY(1.25); }
 }
 
 @keyframes ring-turn {

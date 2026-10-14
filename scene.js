@@ -97,6 +97,10 @@ const FloorShader = {
     tDiffuse: { value: null },
     textureMatrix: { value: null },
     ink: { value: new THREE.Color(0x16181d) },
+    // Where a disc last landed (xz) and how long ago, in seconds.
+    ripple: { value: new THREE.Vector3(0, 0, 99) },
+    // Where the pointer meets the floor (xz), and how present it is (0-1).
+    pointer: { value: new THREE.Vector3(0, 0, 0) },
   },
   vertexShader: /* glsl */ `
     uniform mat4 textureMatrix;
@@ -113,6 +117,8 @@ const FloorShader = {
   fragmentShader: /* glsl */ `
     uniform vec3 color;
     uniform vec3 ink;
+    uniform vec3 ripple;
+    uniform vec3 pointer;
     uniform sampler2D tDiffuse;
     varying vec4 vUv;
     varying vec3 vWorld;
@@ -126,7 +132,13 @@ const FloorShader = {
       // Strongest under the front disc, gone by the horizon and toward the camera.
       float d = length(vWorld.xz * vec2(0.6, 1.0));
       float fade = (1.0 - smoothstep(1.2, 7.5, d)) * (1.0 - smoothstep(0.4, 2.4, vWorld.z));
-      float line = gridLine(vWorld.xz * 1.6) * 0.11 * fade;
+      // A ring runs out across the grid when a disc lands, and the grid wakes up near the pointer.
+      float r = length(vWorld.xz - ripple.xy);
+      float front = ripple.z * 3.4;
+      float ring = exp(-pow((r - front) / 0.22, 2.0)) * exp(-ripple.z * 1.6);
+      float glow = exp(-pow(length(vWorld.xz - pointer.xy) / 1.1, 2.0)) * pointer.z;
+      float boost = 1.0 + ring * 3.0 + glow * 1.6;
+      float line = gridLine(vWorld.xz * 1.6) * 0.11 * fade * boost + ring * 0.05 * fade;
       vec4 mirror = texture2DProj(tDiffuse, vUv);
       float m = mirror.a * 0.26 * fade;
       vec3 rgb = mix(ink, mirror.rgb, m / max(m + line, 1e-4));
@@ -165,7 +177,7 @@ function annulus(inner, outer, depth) {
   return geo;
 }
 
-export function create(canvas, { count, label, onSelect, onActivate, onFrame, onProgress, holdIntro = false }) {
+export function create(canvas, { count, label, onSelect, onActivate, onFrame, onProgress, onDetent, onGrab, holdIntro = false }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -307,9 +319,20 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
   let lastDragX = 0;
   let lastDragT = 0;
   let envDrift = 0;
+  let speed = 0;         // smoothed carousel velocity, for leaning into the turn
+  let lastDetent = 0;    // last whole disc the carousel passed, for haptic ticks
+  let rippleT = 99;
+  const ripple = floor.material.uniforms.ripple.value;
+  const pointerFloor = floor.material.uniforms.pointer.value;
+  // Press and hold the front disc to grab it like a record.
+  let holdTimer = 0;
+  let grabbed = false;
+  let grabAngle = 0;
+  let grabVel = 0;
+  let grabT = 0;
 
   // Effects on the front disc. Each eases toward its target.
-  const fx = { hover: 0, hoverT: 0, flip: 0, flipT: 0, push: 0, pushT: 0, wobble: 0 };
+  const fx = { hover: 0, hoverT: 0, flip: 0, flipT: 0, push: 0, pushT: 0, wobble: 0, press: 0, pressT: 0 };
   let pushTimer = 0;
   const ease = (v, t, rate, dt) => v + (t - v) * (1 - Math.exp(-rate * dt));
 
@@ -320,19 +343,23 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
       const a = Math.min(1, Math.abs(k));
       const e = 1 - (1 - introT) ** 3;
       const front = i === target;
-      const lift = front ? fx.hover * 0.08 + fx.push * 0.12 : 0;
+      const lift = front ? fx.hover * 0.08 + fx.push * 0.12 - fx.press * 0.05 : 0;
       const z = -Math.abs(k) * 1.15 + (front ? fx.push * 1.1 : 0);
       d.position.set(k * SPACING, -0.04 * k * k + (1 - e) * -1.4 + lift, z);
       const s = (1 - a * 0.3) * (0.82 + 0.18 * e);
       d.scale.setScalar(s);
       // A24-style tilt: the disc leans back and turns toward the centre. A sealed disc
       // flips over to show its data side; a refused code makes it shudder.
+      // Discs lean into the turn while the carousel moves, like they have weight.
+      const lean = Math.max(-1, Math.min(1, speed / 6));
       d.rotation.set(
-        -0.62 + tilt.y * 0.16 + (1 - e) * -0.9 + (front ? fx.flip : 0),
-        -0.32 * Math.sign(k) * a + 0.18 + tilt.x * 0.22,
-        0.06 + (front ? Math.sin(time * 0.03) * fx.wobble * 0.14 : 0),
+        -0.62 + tilt.y * 0.16 + (1 - e) * -0.9 + (front ? fx.flip : 0) + Math.abs(lean) * 0.08,
+        -0.32 * Math.sign(k) * a + 0.18 + tilt.x * 0.22 - lean * 0.28,
+        0.06 + (front ? Math.sin(time * 0.03) * fx.wobble * 0.14 : 0) + lean * 0.1,
       );
-      if (!reduceMotion) {
+      if (front && grabbed) {
+        // Held: the disc turns only with your hand.
+      } else if (!reduceMotion) {
         // Spin relaxes back to a slow idle after a burst.
         const idle = Math.abs(k) < 0.5 ? 0.35 : 0.12;
         d.userData.spinV = ease(d.userData.spinV, idle, 1.1, dt);
@@ -373,12 +400,22 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     fx.flip = ease(fx.flip, fx.flipT, 7, dt);
     fx.push = ease(fx.push, fx.pushT, 9, dt);
     fx.wobble = ease(fx.wobble, 0, 3.5, dt);
+    fx.press = ease(fx.press, fx.pressT, 12, dt);
+    speed = ease(speed, dragging ? dragVel : vel, 10, dt);
+    rippleT += dt;
+    ripple.z = rippleT;
+    // One tick each time the carousel passes a disc.
+    const detent = Math.round(pos);
+    if (detent !== lastDetent) {
+      lastDetent = detent;
+      if (detent >= 0 && detent < count) onDetent?.(detent);
+    }
     // The light sweeps across the mirror as the pointer moves, and drifts slowly on its own.
     if (!reduceMotion) envDrift += dt * 0.05;
     scene.environmentRotation.set(tilt.y * 0.35, tilt.x * 0.9 + envDrift, 0);
     layout(dt, now);
     renderer.render(scene, camera);
-    onFrame?.(pos);
+    onFrame?.(pos, speed);
     frame = requestAnimationFrame(tick);
   }
   function start() {
@@ -416,6 +453,28 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
   const onVisibility = () => (document.hidden ? stop() : start());
   document.addEventListener("visibilitychange", onVisibility);
 
+  // How a drag feels: soft notches at each disc, and a rubber band past either end.
+  function feel(raw) {
+    const notched = raw - (Math.sin(raw * TAU) / TAU) * 0.32;
+    const band = (over) => 0.45 * (1 - Math.exp(-over / 0.45));
+    if (notched < 0) return -band(-notched);
+    if (notched > count - 1) return count - 1 + band(notched - (count - 1));
+    return notched;
+  }
+
+  // Screen position of the front disc's centre, for grabbing it.
+  const centre = new THREE.Vector3();
+  function discCentre() {
+    const r = canvas.getBoundingClientRect();
+    centre.copy(discs[target].position).project(camera);
+    return { x: r.left + (centre.x + 1) / 2 * r.width, y: r.top + (1 - centre.y) / 2 * r.height };
+  }
+  const angleAt = (e, c) => Math.atan2(-(e.clientY - c.y), e.clientX - c.x);
+
+  // Where the pointer meets the floor, so the grid can light up there.
+  const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.92);
+  const floorHit = new THREE.Vector3();
+
   // ── Pointer: tilt on hover, drag to scrub, click to pick ────────────
   const ray = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
@@ -433,10 +492,31 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     const r = canvas.getBoundingClientRect();
     tilt.tx = ((e.clientX - r.left) / r.width - 0.5) * 2;
     tilt.ty = ((e.clientY - r.top) / r.height - 0.5) * 2;
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    if (ray.ray.intersectPlane(floorPlane, floorHit)) pointerFloor.set(floorHit.x, floorHit.z, 1);
+    if (grabbed) {
+      const c = discCentre();
+      const a = angleAt(e, c);
+      let delta = a - grabAngle;
+      delta = ((delta + Math.PI) % TAU + TAU) % TAU - Math.PI;
+      grabAngle = a;
+      const d = discs[target].userData;
+      d.angle += delta;
+      const now = performance.now();
+      const dtMove = Math.max(8, now - grabT) / 1000;
+      grabVel = grabVel * 0.5 + (delta / dtMove) * 0.5;
+      grabT = now;
+      return;
+    }
+    if (dragging && holdTimer && Math.abs(e.clientX - dragStartX) > 6) {
+      clearTimeout(holdTimer);
+      holdTimer = 0;
+    }
     if (dragging) {
       const dx = (e.clientX - dragStartX) / r.width;
       dragMoved = Math.max(dragMoved, Math.abs(e.clientX - dragStartX));
-      pos = Math.max(-0.4, Math.min(count - 0.6, dragStartPos - dx * 2.2));
+      pos = feel(dragStartPos - dx * 2.2);
       const now = performance.now();
       const dtMove = Math.max(1, now - lastDragT) / 1000;
       const v = (-(e.clientX - lastDragX) / r.width) * 2.2 / dtMove;
@@ -449,7 +529,7 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
       fx.hoverT = over === target ? 1 : 0;
     }
   });
-  canvas.addEventListener("pointerleave", () => { tilt.tx = 0; tilt.ty = 0; fx.hoverT = 0; });
+  canvas.addEventListener("pointerleave", () => { tilt.tx = 0; tilt.ty = 0; fx.hoverT = 0; pointerFloor.z = 0; });
   canvas.addEventListener("pointerdown", (e) => {
     dragging = true;
     dragStartX = e.clientX;
@@ -461,8 +541,36 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     lastDragT = performance.now();
     canvas.setPointerCapture(e.pointerId);
     canvas.style.cursor = "grabbing";
+    clearTimeout(holdTimer);
+    holdTimer = 0;
+    if (!reduceMotion && pick(e) === target && fx.flipT === 0) {
+      // Hold still for a moment on the front disc and you've got it in your hand.
+      holdTimer = setTimeout(() => {
+        holdTimer = 0;
+        grabbed = true;
+        dragging = false;
+        pos = target;
+        vel = 0;
+        fx.pressT = 1;
+        grabVel = 0;
+        grabT = performance.now();
+        grabAngle = angleAt(e, discCentre());
+        onGrab?.(true);
+      }, 220);
+    }
   });
   const release = (e) => {
+    clearTimeout(holdTimer);
+    holdTimer = 0;
+    if (grabbed) {
+      // Let go: it keeps the spin you gave it, then winds down to idle.
+      grabbed = false;
+      fx.pressT = 0;
+      discs[target].userData.spinV = Math.max(-40, Math.min(40, grabVel));
+      canvas.style.cursor = "grab";
+      onGrab?.(false);
+      return;
+    }
     if (!dragging) return;
     dragging = false;
     canvas.style.cursor = "grab";
@@ -490,7 +598,7 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     scrub(p) {
       dragging = true;
       vel = 0;
-      pos = Math.max(-0.2, Math.min(count - 0.8, p));
+      pos = feel(p);
     },
     endScrub() {
       if (!dragging) return;
@@ -505,7 +613,7 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     pulse(kind) {
       if (reduceMotion) return;
       const d = discs[target];
-      if (kind === "select") d.userData.spinV = 7;
+      if (kind === "select") { d.userData.spinV = 7; ripple.x = 0; ripple.y = 0; rippleT = 0.12; }
       if (kind === "open") {
         d.userData.spinV = 22;
         fx.pushT = 1;
@@ -515,7 +623,7 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
       if (kind === "seal") fx.flipT = Math.PI;
       if (kind === "unseal") fx.flipT = 0;
       if (kind === "deny") fx.wobble = 1;
-      if (kind === "unlock") { fx.flipT = 0; d.userData.spinV = 16; }
+      if (kind === "unlock") { fx.flipT = 0; d.userData.spinV = 16; rippleT = 0; }
     },
     intro() { introPlaying = true; },
     dispose() {

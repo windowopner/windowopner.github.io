@@ -89,9 +89,11 @@ const dial = $("dial");
 const SVG = "http://www.w3.org/2000/svg";
 const dialRing = document.createElementNS(SVG, "g");
 dialRing.setAttribute("class", "dial-ring");
+const ticks = [];
 for (let deg = 0; deg < 360; deg += 2) {
   const major = deg % 30 === 0;
   const t = document.createElementNS(SVG, "line");
+  ticks.push({ el: t, deg, base: major ? -89 : -91.5, stretch: 0 });
   t.setAttribute("x1", "0");
   t.setAttribute("x2", "0");
   t.setAttribute("y1", String(-94));
@@ -184,10 +186,48 @@ function turnDial() {
 }
 
 // Called every frame by the 3D view with the carousel's actual position.
-function onFrame(p) {
-  dialRing.style.transform = `rotate(${-p * STEP}deg)`;
+let lastStretch = 0;
+function onFrame(p, speed = 0) {
+  const ringAngle = -p * STEP;
+  dialRing.style.transform = `rotate(${ringAngle}deg)`;
   placePlayhead(p);
   markLoaded(1);
+  // Ticks near the pointer stretch with speed, like a needle swinging through them.
+  const amount = Math.min(1, Math.abs(speed) / 4);
+  if (amount < 0.01 && lastStretch < 0.01) return;
+  lastStretch = amount;
+  for (const t of ticks) {
+    const screen = ((t.deg + ringAngle) % 360 + 540) % 360 - 180; // 0 at the pointer
+    const near = Math.max(0, 1 - Math.abs(screen) / 46);
+    const stretch = near * near * amount * 7;
+    if (Math.abs(stretch - t.stretch) < 0.05) continue;
+    t.stretch = stretch;
+    t.el.setAttribute("y2", String(t.base - stretch));
+  }
+}
+
+// A notch passing under the pointer: a short buzz on phones that support it.
+function onDetent() {
+  if (scrubbing || document.documentElement.classList.contains("is-dragging")) navigator.vibrate?.(6);
+  pointer.classList.remove("tap");
+  void pointer.getBoundingClientRect();
+  pointer.classList.add("tap");
+}
+
+// Whether a finger or button is down on the stage (so notches buzz only under your hand).
+const root = document.documentElement;
+$("stage").addEventListener("pointerdown", () => root.classList.add("is-dragging"));
+window.addEventListener("pointerup", () => root.classList.remove("is-dragging"));
+window.addEventListener("pointercancel", () => root.classList.remove("is-dragging"));
+
+// Holding a disc: swap the footer hint, since the gesture isn't obvious.
+const hint = document.querySelector(".hint");
+const hintHTML = hint.innerHTML;
+function onGrab(on) {
+  document.documentElement.classList.toggle("is-grabbing", on);
+  hint.textContent = on ? "Turn it, then let go to spin." : "";
+  if (!on) hint.innerHTML = hintHTML;
+  if (on) navigator.vibrate?.(12);
 }
 
 // ── Timeline: the discs laid out on a track, with a playhead that follows the carousel.
@@ -343,6 +383,23 @@ function drawLabel(i, ctx, size) {
   ctx.restore();
 }
 
+// ── Scramble: a code flickers through random glyphs before settling ──
+const GLYPHS = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789_#";
+const scrambles = new WeakMap();
+function scramble(el, text) {
+  clearInterval(scrambles.get(el));
+  if (reducedMotion) { el.textContent = text; return; }
+  let step = 0;
+  const steps = 8;
+  const run = () => {
+    step++;
+    el.textContent = [...text].map((ch, k) => (k < (step / steps) * text.length ? ch : GLYPHS[Math.floor(Math.random() * GLYPHS.length)])).join("");
+    if (step >= steps) { clearInterval(scrambles.get(el)); el.textContent = text; }
+  };
+  scrambles.set(el, setInterval(run, 34));
+  run();
+}
+
 // ── Reveal: the title rises letter by letter, the text darkens word by word ──
 function revealLetters(el, text) {
   // Spaces stay plain text so long titles can still wrap between words.
@@ -385,7 +442,7 @@ function select(i) {
   setRing(d, index);
   setBignum(index + 1);
 
-  $("code").textContent = code(index);
+  scramble($("code"), code(index));
   if (d.redacted) {
     mosaic($("title"), d.title, 7, true);
     mosaic($("text"), d.text, 5, false);
@@ -671,6 +728,8 @@ async function startScene() {
       onActivate: activate,
       onFrame,
       onProgress: markLoaded,
+      onDetent,
+      onGrab,
       holdIntro: document.documentElement.classList.contains("opening"),
     });
     scene.setIndex(index);
