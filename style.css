@@ -245,6 +245,8 @@ a {
 .stage {
   position: relative;
   min-height: 0;
+  /* The dial and the big number size themselves to the stage, not the window. */
+  container-type: size;
   display: grid;
   place-items: center;
 }
@@ -277,7 +279,7 @@ a {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(88%, 72dvh);
+  width: min(88cqw, 80cqh);
   aspect-ratio: 1;
   transform: translate(-50%, calc(-50% - 22px));
   overflow: visible;
@@ -453,6 +455,65 @@ a {
 
 .no-scene .needle {
   transition: left 600ms var(--ease);
+}
+
+/* The disc number, huge and outlined behind everything on the stage. */
+.bignum {
+  position: absolute;
+  left: -2%;
+  top: -3%;
+  display: flex;
+  font-size: min(66cqh, 27vw);
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
+  color: rgb(22 24 29 / 0.035);
+  -webkit-text-stroke: 1.2px rgb(22 24 29 / 0.16);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  user-select: none;
+}
+
+.digit {
+  display: block;
+  height: 1em;
+  overflow: hidden;
+}
+
+/* Tight like display type, without shrinking each digit's box (that would clip it). */
+.digit + .digit {
+  margin-left: -0.08em;
+}
+
+.strip {
+  --d: 0;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(calc(var(--d) * -1em));
+  transition: transform 1100ms var(--ease);
+}
+
+.strip > span {
+  display: block;
+  height: 1em;
+  line-height: 1;
+  text-align: center;
+}
+
+.digit:nth-child(2) .strip {
+  transition-delay: 70ms;
+}
+
+/* Text band round the dial, turning slowly. */
+.ring-band {
+  animation: ring-turn 90s linear infinite;
+}
+
+.ring-text {
+  font-family: var(--mono);
+  font-size: 3.1px;
+  fill: var(--ink-2);
+  letter-spacing: 0.4px;
 }
 
 /* No WebGL: a flat iridescent disc stands in. */
@@ -868,6 +929,10 @@ a {
   to { opacity: 1; transform: none; }
 }
 
+@keyframes ring-turn {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes mosaic-in {
   from { clip-path: inset(0 100% 0 0); }
   to { clip-path: inset(0 0 0 0); }
@@ -933,7 +998,7 @@ a {
   }
 
   .dial {
-    width: min(86%, 86vw, 52dvh);
+    width: min(86cqw, 84cqh);
     top: calc(50% - 14px);
   }
 
@@ -941,6 +1006,12 @@ a {
     bottom: 0;
     width: 100%;
     gap: 10px;
+  }
+
+  .bignum {
+    left: 0;
+    top: 0;
+    font-size: min(40cqh, 48vw);
   }
 
   .index {

@@ -57,6 +57,7 @@ const code = (i) => `DSC_${pad(i + 1)}`;
 const kindOf = (d) => (d.status ? `${d.kind}, ${d.status}` : d.kind);
 
 let index = 0;
+let shownIndex = -1;
 let scene = null;
 
 // ── Index list (left column; a row of codes on phones) ───────────────
@@ -123,6 +124,53 @@ pointer.setAttribute("d", "M -2.4 -99.5 L 2.4 -99.5 L 0 -95.5 Z");
 pointer.setAttribute("class", "pointer");
 dial.append(dialRing, pointer);
 let dialAngle = 0;
+
+// A band of text running round outside the ticks, turning slowly. It leaves a gap at the
+// top for the pointer.
+const RING_R = 103;
+const ringPath = document.createElementNS(SVG, "path");
+ringPath.setAttribute("id", "ring-path");
+ringPath.setAttribute("d", `M 0 ${-RING_R} A ${RING_R} ${RING_R} 0 1 1 -0.01 ${-RING_R}`);
+ringPath.setAttribute("fill", "none");
+const ringText = document.createElementNS(SVG, "text");
+ringText.setAttribute("class", "ring-text");
+const ringSpan = document.createElementNS(SVG, "textPath");
+ringSpan.setAttribute("href", "#ring-path");
+ringSpan.setAttribute("startOffset", "3%");
+ringText.appendChild(ringSpan);
+const ringGroup = document.createElementNS(SVG, "g");
+ringGroup.setAttribute("class", "ring-band");
+ringGroup.append(ringPath, ringText);
+dial.insertBefore(ringGroup, dialRing);
+
+function setRing(d, i) {
+  const words = ["SABU ARCHIVE", code(i), d.kind.toUpperCase(), d.locked ? "SEALED" : d.url ? "OPEN" : "PRIVATE", d.stack.toUpperCase()];
+  // Repeated so the band runs most of the way round; whatever passes the end of the path isn't drawn.
+  const band = words.join("   /   ");
+  ringSpan.textContent = `${band}   /   ${band}   /   ${band}`;
+}
+
+// The disc number, huge and outlined behind the stage. Each digit is a strip of 0-9 that
+// rolls to the new value, like an odometer.
+const bignum = $("bignum");
+const digits = [0, 1].map(() => {
+  const cell = document.createElement("span");
+  cell.className = "digit";
+  const strip = document.createElement("span");
+  strip.className = "strip";
+  for (let n = 0; n < 10; n++) {
+    const glyph = document.createElement("span");
+    glyph.textContent = String(n);
+    strip.appendChild(glyph);
+  }
+  cell.appendChild(strip);
+  bignum.appendChild(cell);
+  return strip;
+});
+function setBignum(n) {
+  const text = pad(n);
+  digits.forEach((strip, k) => strip.style.setProperty("--d", text[k]));
+}
 
 function turnDial() {
   dialMarks.forEach((g, i) => g.classList.toggle("on", i === index));
@@ -327,10 +375,15 @@ const actionLabel = $("action-label");
 function select(i) {
   index = (i + DISCS.length) % DISCS.length;
   const d = DISCS[index];
+  const changed = index !== shownIndex;
+  shownIndex = index;
   refreshIndex();
   turnDial();
   scene?.setIndex(index);
+  if (changed) scene?.pulse("select");
   fallbackSpin();
+  setRing(d, index);
+  setBignum(index + 1);
 
   $("code").textContent = code(index);
   if (d.redacted) {
@@ -365,8 +418,14 @@ function select(i) {
 
 function activate() {
   const d = DISCS[index];
-  if (d.url) window.open(d.url, "_blank", "noopener");
-  else if (d.locked) openPad();
+  if (d.url) {
+    // Open straight away (inside the click, so it isn't blocked); the disc flies out as it does.
+    scene?.pulse("open");
+    window.open(d.url, "_blank", "noopener");
+  } else if (d.locked) {
+    scene?.pulse("seal");
+    openPad();
+  }
 }
 
 action.addEventListener("click", activate);
@@ -458,6 +517,7 @@ async function submitCode() {
       closePad();
       applyUnlock(payload);
       select(index);
+      scene?.pulse("unlock");
     }, 420);
   } catch (err) {
     clearInterval(reading);
@@ -467,6 +527,7 @@ async function submitCode() {
     if (failures >= 3) waitUntil = Date.now() + Math.min(30000, 1000 * 2 ** (failures - 3));
     entry = "";
     padStatus("Wrong", "    code");
+    scene?.pulse("deny");
     keypad.classList.remove("shake");
     void keypad.offsetWidth;
     keypad.classList.add("shake");
@@ -494,6 +555,8 @@ $("pad-grid").addEventListener("click", (e) => {
   if (key && !key.disabled) pressPad(key.dataset.k);
 });
 $("keypad-close").addEventListener("click", closePad);
+// Whichever way the keypad closes (button, Escape, backdrop, unlock), the disc flips back.
+keypad.addEventListener("close", () => scene?.pulse("unseal"));
 keypad.addEventListener("click", (e) => { if (e.target === keypad) closePad(); });
 
 // Already unlocked earlier in this tab: restore quietly.

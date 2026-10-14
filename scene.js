@@ -136,6 +136,21 @@ const FloorShader = {
     }`,
 };
 
+// A soft round shadow, drawn once and laid on the floor under each disc.
+function shadowTexture() {
+  const size = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d");
+  const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, "rgba(22,24,29,0.55)");
+  grad.addColorStop(0.45, "rgba(22,24,29,0.22)");
+  grad.addColorStop(1, "rgba(22,24,29,0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(c);
+}
+
 // A flat annulus with a little thickness, facing +Z. UVs map the disc onto a square.
 function annulus(inner, outer, depth) {
   const shape = new THREE.Shape().absarc(0, 0, outer, 0, TAU, false);
@@ -159,9 +174,12 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
 
   const scene = new THREE.Scene();
   scene.environment = studio(renderer);
+  // Discs further back fade into the paper colour, which reads as depth.
+  scene.fog = new THREE.Fog(0xeef1f4, 8, 14.5);
   onProgress?.(0.85);
+  const CAMERA_Z = 6.3;
   const camera = new THREE.PerspectiveCamera(26, 1, 0.1, 100);
-  camera.position.set(0, 0, 7.4);
+  camera.position.set(0, 0, CAMERA_Z);
 
   const groove = grooves();
   const DEPTH = 0.024;
@@ -211,6 +229,18 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
   floor.position.y = -0.92;
   scene.add(floor);
 
+  // Contact shadows sit just above the floor. They're hidden while the mirror renders,
+  // so the floor doesn't reflect its own shadows.
+  const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false, fog: false });
+  const shadowGeo = new THREE.PlaneGeometry(2.6, 2.6);
+  const shadows = [];
+  const mirrorRender = floor.onBeforeRender;
+  floor.onBeforeRender = (...args) => {
+    shadows.forEach((sh) => { sh.visible = false; });
+    mirrorRender(...args);
+    shadows.forEach((sh) => { sh.visible = true; });
+  };
+
   const discs = [];
   const labelCanvases = [];
   for (let i = 0; i < count; i++) {
@@ -241,7 +271,13 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     ink.position.z = DEPTH * 0.75 + 0.003;
     spin.add(ink);
 
-    group.userData = { i, spin, tex, angle: Math.random() * TAU };
+    const shadow = new THREE.Mesh(shadowGeo, shadowMat.clone());
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.renderOrder = 1;
+    scene.add(shadow);
+    shadows.push(shadow);
+
+    group.userData = { i, spin, tex, shadow, angle: Math.random() * TAU, spinV: 0.2 };
     scene.add(group);
     discs.push(group);
     drawLabel(i);
@@ -267,28 +303,50 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
   let introT = reduceMotion ? 1 : 0;
   let introPlaying = !holdIntro;
   const tilt = { x: 0, y: 0, tx: 0, ty: 0 };
+  let dragVel = 0;       // carousel units per second while dragging, for the flick
+  let lastDragX = 0;
+  let lastDragT = 0;
+  let envDrift = 0;
 
-  function layout() {
+  // Effects on the front disc. Each eases toward its target.
+  const fx = { hover: 0, hoverT: 0, flip: 0, flipT: 0, push: 0, pushT: 0, wobble: 0 };
+  let pushTimer = 0;
+  const ease = (v, t, rate, dt) => v + (t - v) * (1 - Math.exp(-rate * dt));
+
+  function layout(dt = 0.016, time = 0) {
     for (const d of discs) {
-      const { i, spin } = d.userData;
+      const { i, spin, shadow } = d.userData;
       const k = i - pos;                       // distance from the front, in discs
       const a = Math.min(1, Math.abs(k));
       const e = 1 - (1 - introT) ** 3;
-      d.position.set(k * SPACING, -0.04 * k * k + (1 - e) * -1.4, -Math.abs(k) * 1.15);
+      const front = i === target;
+      const lift = front ? fx.hover * 0.08 + fx.push * 0.12 : 0;
+      const z = -Math.abs(k) * 1.15 + (front ? fx.push * 1.1 : 0);
+      d.position.set(k * SPACING, -0.04 * k * k + (1 - e) * -1.4 + lift, z);
       const s = (1 - a * 0.3) * (0.82 + 0.18 * e);
       d.scale.setScalar(s);
-      // A24-style tilt: the disc leans back and turns toward the centre.
+      // A24-style tilt: the disc leans back and turns toward the centre. A sealed disc
+      // flips over to show its data side; a refused code makes it shudder.
       d.rotation.set(
-        -0.62 + tilt.y * 0.16 + (1 - e) * -0.9,
+        -0.62 + tilt.y * 0.16 + (1 - e) * -0.9 + (front ? fx.flip : 0),
         -0.32 * Math.sign(k) * a + 0.18 + tilt.x * 0.22,
-        0.06,
+        0.06 + (front ? Math.sin(time * 0.03) * fx.wobble * 0.14 : 0),
       );
       if (!reduceMotion) {
-        const speed = Math.abs(k) < 0.5 ? 0.35 : 0.12;
-        d.userData.angle = (d.userData.angle + speed * 0.016) % TAU;
+        // Spin relaxes back to a slow idle after a burst.
+        const idle = Math.abs(k) < 0.5 ? 0.35 : 0.12;
+        d.userData.spinV = ease(d.userData.spinV, idle, 1.1, dt);
+        d.userData.angle = (d.userData.angle + d.userData.spinV * dt) % TAU;
       }
       spin.rotation.z = d.userData.angle;
       d.visible = Math.abs(k) < 3.2;
+
+      // Shadow: under the disc, softer and wider the higher it floats.
+      const height = d.position.y - floor.position.y;
+      shadow.position.set(d.position.x, floor.position.y + 0.004, d.position.z);
+      shadow.scale.setScalar(s * (0.9 + height * 0.35));
+      shadow.material.opacity = (front ? 0.85 : 0.55) * (1 - a * 0.4) * e / (0.6 + height * 0.8);
+      shadow.visible = d.visible;
     }
   }
 
@@ -311,7 +369,14 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     if (introPlaying && introT < 1) introT = Math.min(1, introT + dt / 1.6);
     tilt.x += (tilt.tx - tilt.x) * 0.06;
     tilt.y += (tilt.ty - tilt.y) * 0.06;
-    layout();
+    fx.hover = ease(fx.hover, fx.hoverT, 8, dt);
+    fx.flip = ease(fx.flip, fx.flipT, 7, dt);
+    fx.push = ease(fx.push, fx.pushT, 9, dt);
+    fx.wobble = ease(fx.wobble, 0, 3.5, dt);
+    // The light sweeps across the mirror as the pointer moves, and drifts slowly on its own.
+    if (!reduceMotion) envDrift += dt * 0.05;
+    scene.environmentRotation.set(tilt.y * 0.35, tilt.x * 0.9 + envDrift, 0);
+    layout(dt, now);
     renderer.render(scene, camera);
     onFrame?.(pos);
     frame = requestAnimationFrame(tick);
@@ -335,7 +400,7 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     floor.getRenderTarget().setSize(Math.round(w * dpr * 0.6), Math.round(h * dpr * 0.6));
     camera.aspect = w / h;
     // Keep the front disc about the same size whether the stage is wide or tall.
-    camera.position.z = 7.4 * Math.max(1, 1.05 / camera.aspect);
+    camera.position.z = CAMERA_Z * Math.max(1, 1.05 / camera.aspect);
     camera.updateProjectionMatrix();
     if (!running) { layout(); renderer.render(scene, camera); }
   }
@@ -372,17 +437,28 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
       const dx = (e.clientX - dragStartX) / r.width;
       dragMoved = Math.max(dragMoved, Math.abs(e.clientX - dragStartX));
       pos = Math.max(-0.4, Math.min(count - 0.6, dragStartPos - dx * 2.2));
+      const now = performance.now();
+      const dtMove = Math.max(1, now - lastDragT) / 1000;
+      const v = (-(e.clientX - lastDragX) / r.width) * 2.2 / dtMove;
+      dragVel = dragVel * 0.6 + v * 0.4;
+      lastDragX = e.clientX;
+      lastDragT = now;
     } else if (e.pointerType === "mouse") {
-      canvas.style.cursor = pick(e) >= 0 ? "pointer" : "grab";
+      const over = pick(e);
+      canvas.style.cursor = over >= 0 ? "pointer" : "grab";
+      fx.hoverT = over === target ? 1 : 0;
     }
   });
-  canvas.addEventListener("pointerleave", () => { tilt.tx = 0; tilt.ty = 0; });
+  canvas.addEventListener("pointerleave", () => { tilt.tx = 0; tilt.ty = 0; fx.hoverT = 0; });
   canvas.addEventListener("pointerdown", (e) => {
     dragging = true;
     dragStartX = e.clientX;
     dragStartPos = pos;
     dragMoved = 0;
     vel = 0;
+    dragVel = 0;
+    lastDragX = e.clientX;
+    lastDragT = performance.now();
     canvas.setPointerCapture(e.pointerId);
     canvas.style.cursor = "grabbing";
   });
@@ -396,7 +472,10 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
       else if (i >= 0) onSelect?.(i);
       return;
     }
-    const next = Math.max(0, Math.min(count - 1, Math.round(pos)));
+    // A flick carries on a little past where the finger let go.
+    const thrown = performance.now() - lastDragT < 80 ? dragVel * 0.22 : 0;
+    const next = Math.max(0, Math.min(count - 1, Math.round(pos + thrown)));
+    vel = dragVel * 0.5;
     if (next !== target) onSelect?.(next);
     else target = next;
   };
@@ -420,6 +499,24 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
       if (next !== target) onSelect?.(next);
     },
     setLabel: drawLabel,
+    // Physical feedback on the front disc: "select" spins it up, "open" throws it toward
+    // you, "seal" flips it to the data side, "unseal" flips it back, "deny" shakes it,
+    // "unlock" flips back with a fast spin.
+    pulse(kind) {
+      if (reduceMotion) return;
+      const d = discs[target];
+      if (kind === "select") d.userData.spinV = 7;
+      if (kind === "open") {
+        d.userData.spinV = 22;
+        fx.pushT = 1;
+        clearTimeout(pushTimer);
+        pushTimer = setTimeout(() => { fx.pushT = 0; }, 420);
+      }
+      if (kind === "seal") fx.flipT = Math.PI;
+      if (kind === "unseal") fx.flipT = 0;
+      if (kind === "deny") fx.wobble = 1;
+      if (kind === "unlock") { fx.flipT = 0; d.userData.spinV = 16; }
+    },
     intro() { introPlaying = true; },
     dispose() {
       stop();
