@@ -11,6 +11,7 @@
 //   opts.holdIntro       wait for intro() before the discs rise into place
 
 import * as THREE from "three";
+import { Reflector } from "three/addons/objects/Reflector.js";
 
 const TAU = Math.PI * 2;
 const SPACING = 2.45;
@@ -86,6 +87,55 @@ function filmThickness() {
   return t;
 }
 
+// The floor the discs float over: a faint mirror plus a perspective grid, both fading out
+// toward the horizon. Reflector supplies the mirrored render; this shader decides how much
+// of it shows and draws the grid on top.
+const FloorShader = {
+  name: "ArchiveFloor",
+  uniforms: {
+    color: { value: null },
+    tDiffuse: { value: null },
+    textureMatrix: { value: null },
+    ink: { value: new THREE.Color(0x16181d) },
+  },
+  vertexShader: /* glsl */ `
+    uniform mat4 textureMatrix;
+    varying vec4 vUv;
+    varying vec3 vWorld;
+    #include <common>
+    #include <logdepthbuf_pars_vertex>
+    void main() {
+      vUv = textureMatrix * vec4(position, 1.0);
+      vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      #include <logdepthbuf_vertex>
+    }`,
+  fragmentShader: /* glsl */ `
+    uniform vec3 color;
+    uniform vec3 ink;
+    uniform sampler2D tDiffuse;
+    varying vec4 vUv;
+    varying vec3 vWorld;
+    #include <logdepthbuf_pars_fragment>
+    float gridLine(vec2 p) {
+      vec2 g = abs(fract(p - 0.5) - 0.5) / fwidth(p);
+      return 1.0 - min(min(g.x, g.y), 1.0);
+    }
+    void main() {
+      #include <logdepthbuf_fragment>
+      // Strongest under the front disc, gone by the horizon and toward the camera.
+      float d = length(vWorld.xz * vec2(0.6, 1.0));
+      float fade = (1.0 - smoothstep(1.2, 7.5, d)) * (1.0 - smoothstep(0.4, 2.4, vWorld.z));
+      float line = gridLine(vWorld.xz * 1.6) * 0.11 * fade;
+      vec4 mirror = texture2DProj(tDiffuse, vUv);
+      float m = mirror.a * 0.26 * fade;
+      vec3 rgb = mix(ink, mirror.rgb, m / max(m + line, 1e-4));
+      gl_FragColor = vec4(rgb, clamp(m + line, 0.0, 1.0));
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+};
+
 // A flat annulus with a little thickness, facing +Z. UVs map the disc onto a square.
 function annulus(inner, outer, depth) {
   const shape = new THREE.Shape().absarc(0, 0, outer, 0, TAU, false);
@@ -100,7 +150,7 @@ function annulus(inner, outer, depth) {
   return geo;
 }
 
-export function create(canvas, { count, label, onSelect, onActivate, holdIntro = false }) {
+export function create(canvas, { count, label, onSelect, onActivate, onFrame, onProgress, holdIntro = false }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -109,6 +159,7 @@ export function create(canvas, { count, label, onSelect, onActivate, holdIntro =
 
   const scene = new THREE.Scene();
   scene.environment = studio(renderer);
+  onProgress?.(0.85);
   const camera = new THREE.PerspectiveCamera(26, 1, 0.1, 100);
   camera.position.set(0, 0, 7.4);
 
@@ -145,6 +196,20 @@ export function create(canvas, { count, label, onSelect, onActivate, holdIntro =
     clearcoatRoughness: 0.02,
     envMapIntensity: 1.6,
   });
+
+  const floor = new Reflector(new THREE.PlaneGeometry(40, 40), {
+    shader: FloorShader,
+    clipBias: 0.003,
+    textureWidth: 1024,
+    textureHeight: 1024,
+    multisample: 0,
+  });
+  floor.material.transparent = true;
+  floor.material.depthWrite = false;
+  floor.material.extensions = { derivatives: true };
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.92;
+  scene.add(floor);
 
   const discs = [];
   const labelCanvases = [];
@@ -248,6 +313,7 @@ export function create(canvas, { count, label, onSelect, onActivate, holdIntro =
     tilt.y += (tilt.ty - tilt.y) * 0.06;
     layout();
     renderer.render(scene, camera);
+    onFrame?.(pos);
     frame = requestAnimationFrame(tick);
   }
   function start() {
@@ -265,6 +331,8 @@ export function create(canvas, { count, label, onSelect, onActivate, holdIntro =
     const w = canvas.clientWidth || 1;
     const h = canvas.clientHeight || 1;
     renderer.setSize(w, h, false);
+    const dpr = renderer.getPixelRatio();
+    floor.getRenderTarget().setSize(Math.round(w * dpr * 0.6), Math.round(h * dpr * 0.6));
     camera.aspect = w / h;
     // Keep the front disc about the same size whether the stage is wide or tall.
     camera.position.z = 7.4 * Math.max(1, 1.05 / camera.aspect);
@@ -339,6 +407,18 @@ export function create(canvas, { count, label, onSelect, onActivate, holdIntro =
 
   return {
     setIndex(i) { target = i; if (reduceMotion) { pos = i; vel = 0; } },
+    // Scrubbing from outside (the timeline): follow the finger, then settle on the nearest disc.
+    scrub(p) {
+      dragging = true;
+      vel = 0;
+      pos = Math.max(-0.2, Math.min(count - 0.8, p));
+    },
+    endScrub() {
+      if (!dragging) return;
+      dragging = false;
+      const next = Math.max(0, Math.min(count - 1, Math.round(pos)));
+      if (next !== target) onSelect?.(next);
+    },
     setLabel: drawLabel,
     intro() { introPlaying = true; },
     dispose() {

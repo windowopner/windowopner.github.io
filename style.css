@@ -256,9 +256,15 @@ a {
   height: 100%;
   cursor: grab;
   touch-action: pan-y;
-  /* Neighbouring discs fade out at the stage edges instead of being cut off. */
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
+  /* Neighbouring discs and the floor fade out at the stage edges instead of being cut off. */
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent),
+    linear-gradient(180deg, #000 72%, transparent 96%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent),
+    linear-gradient(180deg, #000 72%, transparent 96%);
+  mask-composite: intersect;
   opacity: 0;
   transition: opacity 600ms ease;
 }
@@ -271,14 +277,19 @@ a {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(92%, 82dvh);
+  width: min(88%, 72dvh);
   aspect-ratio: 1;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, calc(-50% - 22px));
   overflow: visible;
   pointer-events: none;
 }
 
 .dial-ring {
+  will-change: transform;
+}
+
+/* Without the 3D view nothing drives the dial frame by frame, so it eases on its own. */
+.no-scene .dial-ring {
   transition: transform 1100ms var(--ease);
 }
 
@@ -321,12 +332,15 @@ a {
   fill: var(--accent);
 }
 
-.stage-keys {
+.timeline {
   position: absolute;
-  bottom: 10px;
   left: 50%;
-  display: flex;
-  gap: 24px;
+  bottom: 8px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  width: min(560px, 86%);
   transform: translateX(-50%);
 }
 
@@ -344,6 +358,101 @@ a {
 
 .step:active {
   transform: translateY(1px);
+}
+
+/* The track: a hairline with fine ticks, five discs on it, and a red playhead. */
+.track {
+  --pad: 14px;
+  position: relative;
+  height: 46px;
+  padding: 0 var(--pad);
+  cursor: ew-resize;
+  touch-action: none;
+  background:
+    linear-gradient(var(--line-strong), var(--line-strong)) center / calc(100% - 2 * var(--pad)) 1px no-repeat,
+    repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 8px) center / calc(100% - 2 * var(--pad)) 7px no-repeat;
+}
+
+.track:focus-visible {
+  outline-offset: 2px;
+}
+
+.track-slots {
+  position: absolute;
+  inset: 0 var(--pad);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+.track-slots li {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--at) * 100%);
+  display: grid;
+  place-items: center;
+  grid-template-rows: 1fr auto;
+  transform: translateX(-50%);
+}
+
+.slot-disc {
+  align-self: center;
+  width: 12px;
+  height: 12px;
+  margin-top: 10px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--paper) 0 18%, transparent 20%),
+    conic-gradient(from 30deg, #cfd6df, #f1d5e3, #d3e0f6, #d9f0e2, #f3ead0, #e0d4f2, #cfd6df);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  transition: transform 360ms var(--ease);
+}
+
+.slot-code {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--ink-2);
+  transition: color 200ms ease;
+}
+
+.track-slots li.on .slot-disc {
+  transform: scale(1.45);
+}
+
+.track-slots li.on .slot-code {
+  color: var(--ink);
+}
+
+.track:hover .slot-disc {
+  box-shadow: 0 0 0 1px var(--ink-2);
+}
+
+.needle {
+  --at: 0;
+  position: absolute;
+  top: 2px;
+  bottom: 14px;
+  left: calc(var(--pad) + var(--at) * (100% - 2 * var(--pad)));
+  width: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.needle::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -3px;
+  border: 3.5px solid transparent;
+  border-top: 5px solid var(--accent);
+  border-bottom: 0;
+}
+
+.no-scene .needle {
+  transition: left 600ms var(--ease);
 }
 
 /* No WebGL: a flat iridescent disc stands in. */
@@ -416,6 +525,19 @@ a {
 .mosaic {
   display: block;
   image-rendering: pixelated;
+  animation: mosaic-in 520ms steps(10) both;
+}
+
+/* Title letters rise into place; text darkens word by word, like it's being read. */
+.sheet-title .ch {
+  display: inline-block;
+  animation: letter-in 620ms var(--ease) both;
+  animation-delay: calc(var(--i) * 22ms);
+}
+
+.sheet-text .wd {
+  animation: word-in 900ms ease both;
+  animation-delay: calc(120ms + var(--i) * 40ms);
 }
 
 .specs {
@@ -705,6 +827,20 @@ a {
   animation: rise 700ms var(--ease) 700ms forwards;
 }
 
+.opening-count {
+  position: absolute;
+  left: var(--gutter);
+  bottom: 18px;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: clamp(36px, 5vw, 64px);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--night-ink);
+  font-variant-numeric: tabular-nums;
+}
+
 .opening-skip {
   position: absolute;
   right: var(--gutter);
@@ -730,6 +866,21 @@ a {
 @keyframes rise {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
+}
+
+@keyframes mosaic-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes letter-in {
+  from { opacity: 0; transform: translateY(0.45em); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes word-in {
+  from { color: var(--ink-3); }
+  to { color: var(--ink-2); }
 }
 
 @keyframes panel-in {
@@ -786,8 +937,10 @@ a {
     top: calc(50% - 14px);
   }
 
-  .stage-keys {
+  .timeline {
     bottom: 0;
+    width: 100%;
+    gap: 10px;
   }
 
   .index {

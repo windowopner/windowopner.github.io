@@ -125,13 +125,67 @@ dial.append(dialRing, pointer);
 let dialAngle = 0;
 
 function turnDial() {
+  dialMarks.forEach((g, i) => g.classList.toggle("on", i === index));
+  if (scene) return; // the 3D view drives the dial frame by frame (see onFrame)
   // Take the short way round.
   const goal = -index * STEP;
-  let delta = ((goal - dialAngle) % 360 + 540) % 360 - 180;
+  const delta = ((goal - dialAngle) % 360 + 540) % 360 - 180;
   dialAngle += delta;
   dialRing.style.transform = `rotate(${dialAngle}deg)`;
-  dialMarks.forEach((g, i) => g.classList.toggle("on", i === index));
+  placePlayhead(index);
 }
+
+// Called every frame by the 3D view with the carousel's actual position.
+function onFrame(p) {
+  dialRing.style.transform = `rotate(${-p * STEP}deg)`;
+  placePlayhead(p);
+  markLoaded(1);
+}
+
+// ── Timeline: the discs laid out on a track, with a playhead that follows the carousel.
+//    Drag along it to scrub; release and it settles on the nearest disc. ───────────
+const track = $("track");
+const needle = $("needle");
+const trackSlots = DISCS.map((d, i) => {
+  const li = document.createElement("li");
+  li.style.setProperty("--at", DISCS.length > 1 ? i / (DISCS.length - 1) : 0.5);
+  li.innerHTML = `<span class="slot-disc"></span><span class="slot-code">${pad(i + 1)}</span>`;
+  $("track-slots").appendChild(li);
+  return li;
+});
+
+function placePlayhead(p) {
+  const at = Math.max(0, Math.min(1, p / (DISCS.length - 1)));
+  needle.style.setProperty("--at", at);
+}
+
+let scrubbing = false;
+function trackValue(e) {
+  const r = track.getBoundingClientRect();
+  const inset = parseFloat(getComputedStyle(track).paddingLeft) || 0;
+  const x = (e.clientX - r.left - inset) / Math.max(1, r.width - inset * 2);
+  return Math.max(0, Math.min(1, x)) * (DISCS.length - 1);
+}
+track.addEventListener("pointerdown", (e) => {
+  scrubbing = true;
+  track.setPointerCapture(e.pointerId);
+  track.classList.add("scrubbing");
+  if (scene) scene.scrub(trackValue(e));
+  else select(Math.round(trackValue(e)));
+});
+track.addEventListener("pointermove", (e) => {
+  if (!scrubbing) return;
+  if (scene) scene.scrub(trackValue(e));
+  else select(Math.round(trackValue(e)));
+});
+const endScrub = () => {
+  if (!scrubbing) return;
+  scrubbing = false;
+  track.classList.remove("scrubbing");
+  scene?.endScrub();
+};
+track.addEventListener("pointerup", endScrub);
+track.addEventListener("pointercancel", endScrub);
 
 // ── Mosaic: draw text, shrink it, scale it back up with hard edges ───
 function mosaic(el, text, block, singleLine) {
@@ -241,6 +295,31 @@ function drawLabel(i, ctx, size) {
   ctx.restore();
 }
 
+// ── Reveal: the title rises letter by letter, the text darkens word by word ──
+function revealLetters(el, text) {
+  // Spaces stay plain text so long titles can still wrap between words.
+  el.replaceChildren(...[...text].map((ch, k) => {
+    if (ch === " ") return document.createTextNode(" ");
+    const span = document.createElement("span");
+    span.className = "ch";
+    span.style.setProperty("--i", k);
+    span.textContent = ch;
+    return span;
+  }));
+  el.setAttribute("aria-label", text);
+}
+
+function revealWords(el, text) {
+  const words = text.split(" ");
+  el.replaceChildren(...words.flatMap((w, k) => {
+    const span = document.createElement("span");
+    span.className = "wd";
+    span.style.setProperty("--i", k);
+    span.textContent = w;
+    return k < words.length - 1 ? [span, " "] : [span];
+  }));
+}
+
 // ── The sheet on the right ───────────────────────────────────────────
 const action = $("action");
 const actionLabel = $("action-label");
@@ -258,9 +337,12 @@ function select(i) {
     mosaic($("title"), d.title, 7, true);
     mosaic($("text"), d.text, 5, false);
   } else {
-    $("title").textContent = d.title;
-    $("text").textContent = d.text;
+    revealLetters($("title"), d.title);
+    revealWords($("text"), d.text);
   }
+  track.setAttribute("aria-valuenow", String(index + 1));
+  track.setAttribute("aria-valuetext", d.redacted ? `${code(index)}, sealed` : `${code(index)}, ${d.title}`);
+  trackSlots.forEach((li, k) => li.classList.toggle("on", k === index));
   $("kind").textContent = kindOf(d);
   $("stack").textContent = d.stack;
   $("access").textContent = d.url ? "Open" : d.locked ? "Sealed, needs a code" : "Private";
@@ -505,18 +587,27 @@ function fallbackSpin() {
   fallback.classList.add("swap");
 }
 
+// Loading progress, 0 to 1, shown as the counter on the opening card.
+let loaded = 0;
+function markLoaded(v) { loaded = Math.max(loaded, v); }
+
 async function startScene() {
   try {
+    markLoaded(0.08);
     await Promise.race([
       Promise.all([document.fonts.load('600 40px "Geist"'), document.fonts.load('500 20px "Geist Mono"')]),
       new Promise((r) => setTimeout(r, 1500)),
     ]);
+    markLoaded(0.3);
     const { create } = await import(`./scene.js?v=${VERSION}`);
+    markLoaded(0.6);
     scene = create($("scene"), {
       count: DISCS.length,
       label: drawLabel,
       onSelect: select,
       onActivate: activate,
+      onFrame,
+      onProgress: markLoaded,
       holdIntro: document.documentElement.classList.contains("opening"),
     });
     scene.setIndex(index);
@@ -525,6 +616,7 @@ async function startScene() {
   } catch (err) {
     console.warn("3D view unavailable, showing a flat disc instead.", err);
     document.documentElement.classList.add("no-scene");
+    markLoaded(1);
     return false;
   }
 }
@@ -548,9 +640,26 @@ function runOpening() {
     $("opening-skip").addEventListener("click", finish);
     opening.addEventListener("click", finish);
     window.addEventListener("keydown", (e) => { if (e.key === "Escape" || e.key === "Enter") finish(); }, { once: true });
+    // The counter climbs with real loading progress. The card lifts once the name has
+    // drawn (2.3s) and loading is done, or after 7s whatever happens.
+    const counter = $("opening-count");
+    const started = performance.now();
+    let shown = 0;
+    let last = started;
+    const count = (now) => {
+      if (done) return;
+      // Follow real progress, but never faster than about 2 seconds for the full count.
+      const dt = (now - last) / 1000;
+      last = now;
+      shown = Math.min(loaded * 100, shown + dt * 52);
+      counter.textContent = String(Math.floor(shown)).padStart(3, "0");
+      const elapsed = now - started;
+      if ((elapsed > 2300 && shown >= 99.5) || elapsed > 7000) { counter.textContent = "100"; finish(); return; }
+      requestAnimationFrame(count);
+    };
     document.fonts.ready.then(() => {
       opening.classList.add("run");
-      setTimeout(finish, 2300);
+      requestAnimationFrame(count);
     });
   });
 }

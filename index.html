@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=202610150100">
+  <link rel="stylesheet" href="style.css?v=202610150200">
   <script type="importmap">
     {
       "imports": {
@@ -47,6 +47,7 @@
       <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle">SABU</text>
     </svg>
     <p class="opening-line" aria-hidden="true"><span>Archive</span><span>05 discs</span></p>
+    <p class="opening-count" id="opening-count" aria-hidden="true">000</p>
     <button class="opening-skip" id="opening-skip" type="button">Skip intro</button>
   </div>
 
@@ -68,8 +69,12 @@
         <canvas class="scene" id="scene" aria-hidden="true"></canvas>
         <div class="fallback-disc" id="fallback-disc" aria-hidden="true"><span></span></div>
         <svg class="dial" id="dial" viewBox="-100 -100 200 200" aria-hidden="true"></svg>
-        <div class="stage-keys">
+        <div class="timeline">
           <button class="step" id="prev" type="button" aria-label="Previous disc">Prev</button>
+          <div class="track" id="track" role="slider" tabindex="0" aria-label="Disc" aria-valuemin="1" aria-valuemax="5" aria-valuenow="1">
+            <ol class="track-slots" id="track-slots" aria-hidden="true"></ol>
+            <span class="needle" id="needle" aria-hidden="true"></span>
+          </div>
           <button class="step" id="next" type="button" aria-label="Next disc">Next</button>
         </div>
       </section>
@@ -141,6 +146,6 @@
     </ul>
   </noscript>
 
-  <script type="module" src="app.js?v=202610150100"></script>
+  <script type="module" src="app.js?v=202610150200"></script>
 </body>
 </html>

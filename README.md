@@ -6,6 +6,8 @@ Five projects kept as an archive of discs. One disc sits in front inside a dial 
 
 The discs are real-time 3D (Three.js 0.170 from jsDelivr): a mirrored data layer with a thin-film iridescent sheen whose thickness varies around the disc, so the rainbow turns as it spins, a clear hub, and a label printed in ink. Reflections come from a small studio of softboxes and black flags baked into an environment map. Without WebGL a flat disc stands in.
 
+The discs float over a faint mirror floor with a perspective grid (a custom shader on Three.js's Reflector). Below the stage, a timeline lays the discs out on a track with a red playhead that follows the carousel; drag along it to scrub. Changing disc reveals the title letter by letter and darkens the text word by word. The opening's counter follows real loading progress (fonts, the 3D module, the lighting, the first frame).
+
 A first visit plays a short opening (the name draws in outline, fills, and the card lifts away). Add `?intro` to see it again or `?nointro` to skip it; it never plays with reduced motion. Info opens with `#info` (old `#notes` links land there too).
 
 Plain HTML, CSS, and JavaScript modules with no build step.
