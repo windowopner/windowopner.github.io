@@ -31,6 +31,7 @@ const DISCS = [
   {
     title: "Tempor Incididunt U",
     kind: "MCP server",
+    status: "archived", // shown next to the kind on the display, not in the narrow track list
     stack: "Python, FastAPI",
     text: "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est.",
     url: null,
@@ -226,7 +227,7 @@ function select(i) {
 
   clearTimeout(scrambleTimer);
   $("track").textContent = pad(index + 1);
-  $("kind").textContent = d.kind;
+  $("kind").textContent = d.status ? `${d.kind} · ${d.status}` : d.kind;
   if (d.redacted) {
     mosaic($("title"), d.title.toUpperCase(), 6, true);
     mosaic($("desc"), d.text, 5, false);
