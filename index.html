@@ -4,170 +4,143 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sabu</title>
-  <meta name="description" content="Sabu's projects, loaded into a disc changer.">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#140e0b">
+  <meta name="description" content="Sabu's projects, kept as an archive of discs.">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#eceff3">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://windowopner.github.io/">
   <meta property="og:title" content="Sabu">
-  <meta property="og:description" content="Five projects, loaded into a disc changer.">
+  <meta property="og:description" content="Five projects, kept as an archive of discs.">
   <meta property="og:image" content="https://windowopner.github.io/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Silkscreen&family=Geist:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
-  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
-  <link rel="stylesheet" href="style.css?v=202610132257">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=202610150100">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+  <!-- Decide on the opening before first paint, so returning visitors never see it flash. -->
+  <script>
+    (function () {
+      var q = location.search;
+      var seen = false;
+      try { seen = localStorage.getItem("opening-seen") === "1"; } catch (e) {}
+      var still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var play = q.indexOf("intro") !== -1 && q.indexOf("nointro") === -1 || (!seen && !still && q.indexOf("nointro") === -1);
+      document.documentElement.classList.add(play ? "opening" : "no-opening");
+    })();
+  </script>
 </head>
 <body>
-  <canvas class="sky" id="sky" aria-hidden="true"></canvas>
-  <div class="room">
+  <div class="opening" id="opening">
+    <svg class="opening-mark" viewBox="0 0 600 160" aria-hidden="true">
+      <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle">SABU</text>
+    </svg>
+    <p class="opening-line" aria-hidden="true"><span>Archive</span><span>05 discs</span></p>
+    <button class="opening-skip" id="opening-skip" type="button">Skip intro</button>
+  </div>
+
+  <div class="shell">
     <header class="top">
       <a class="mark" href="./">Sabu</a>
-      <div class="theme-switch" id="theme-switch" role="radiogroup" aria-label="Theme" style="--n: 2">
-        <input type="radio" name="theme" id="theme-room" value="room" checked>
-        <label for="theme-room">Room</label>
-        <input type="radio" name="theme" id="theme-space" value="space">
-        <label for="theme-space">Space</label>
-        <span class="theme-knob" aria-hidden="true"></span>
-      </div>
-      <div class="top-links">
-        <button class="gh" id="notes-btn" type="button" aria-haspopup="dialog"><i class="ph ph-book-open-text" aria-hidden="true"></i><span class="gh-label">Notes</span></button>
-        <a class="gh" href="https://github.com/windowopner" target="_blank" rel="noopener"><i class="ph ph-github-logo" aria-hidden="true"></i><span class="gh-label">GitHub</span></a>
-      </div>
+      <nav class="top-nav" aria-label="Site">
+        <button class="link" id="info-btn" type="button" aria-haspopup="dialog">Info</button>
+        <a class="link" href="https://github.com/windowopner" target="_blank" rel="noopener">GitHub</a>
+      </nav>
     </header>
 
-    <main class="player" aria-label="Project player">
-      <div class="deck" id="deck">
-        <div class="glass">
-          <canvas class="orbit orbit-back" id="orbit-back" aria-hidden="true"></canvas>
-          <canvas class="orbit orbit-front" id="orbit-front" aria-hidden="true"></canvas>
-          <ol class="discs" id="discs" aria-label="Projects"></ol>
-          <div class="clamp" id="clamp" aria-hidden="true"><span class="head"><span class="arm"></span><span class="puck"></span></span></div>
+    <main class="archive" aria-label="Project archive">
+      <nav class="index" aria-label="Discs">
+        <ol class="index-list" id="index-list"></ol>
+      </nav>
+
+      <section class="stage" id="stage" aria-label="Disc viewer">
+        <canvas class="scene" id="scene" aria-hidden="true"></canvas>
+        <div class="fallback-disc" id="fallback-disc" aria-hidden="true"><span></span></div>
+        <svg class="dial" id="dial" viewBox="-100 -100 200 200" aria-hidden="true"></svg>
+        <div class="stage-keys">
+          <button class="step" id="prev" type="button" aria-label="Previous disc">Prev</button>
+          <button class="step" id="next" type="button" aria-label="Next disc">Next</button>
         </div>
-        <div class="nameplate" aria-hidden="true"><span>SABU</span><span>5 DISC</span></div>
-      </div>
+      </section>
 
-      <section class="console" aria-label="Now playing">
-        <div class="stage" id="stage-wrap"><canvas id="stage" width="100" height="100" aria-hidden="true"></canvas></div>
-
-        <div class="readout">
-          <div class="vfd" aria-live="polite">
-            <div class="vfd-row">
-              <span class="track" id="track">01</span>
-              <span class="title" id="title"></span>
-            </div>
-            <div class="vfd-row vfd-sub">
-              <span id="kind"></span>
-              <ol class="slots" id="slots" aria-hidden="true"></ol>
-            </div>
-          </div>
-          <p class="desc" id="desc"></p>
-          <p class="stack" id="stack"></p>
-        </div>
-
-        <div class="controls" id="controls">
-          <div class="hatch" id="hatch" inert>
-            <div class="keypad" role="group" aria-label="Password keypad">
-              <div class="pad-vfd" aria-live="polite"><span id="pad-disc">Code</span><span id="pad-code">--------</span></div>
-              <div class="pad-grid">
-              <button class="pad-key" type="button" data-k="1">1</button>
-              <button class="pad-key" type="button" data-k="2">2</button>
-              <button class="pad-key" type="button" data-k="3">3</button>
-              <button class="pad-key" type="button" data-k="4">4</button>
-              <button class="pad-key" type="button" data-k="5">5</button>
-              <button class="pad-key" type="button" data-k="6">6</button>
-              <button class="pad-key" type="button" data-k="7">7</button>
-              <button class="pad-key" type="button" data-k="8">8</button>
-              <button class="pad-key" type="button" data-k="9">9</button>
-              <button class="pad-key pad-fn" type="button" data-k="C" aria-label="Clear">C</button>
-              <button class="pad-key" type="button" data-k="0">0</button>
-              <button class="pad-key pad-fn" type="button" data-k="OK" disabled aria-label="Unlock">OK</button>
-              </div>
-            </div>
-            <span class="door door-l" aria-hidden="true"></span>
-            <span class="door door-r" aria-hidden="true"></span>
-          </div>
-
-          <div class="keys">
-            <div class="key-wrap">
-              <button class="key" id="prev" type="button" aria-label="Previous disc"><i class="ph ph-caret-left" aria-hidden="true"></i></button>
-              <span class="engrave" aria-hidden="true">Prev</span>
-            </div>
-            <div class="key-wrap">
-              <button class="key" id="next" type="button" aria-label="Next disc"><i class="ph ph-caret-right" aria-hidden="true"></i></button>
-              <span class="engrave" aria-hidden="true">Next</span>
-            </div>
-            <div class="key-wrap">
-              <button class="key key-play" id="play" type="button"><i class="ph ph-play" aria-hidden="true"></i></button>
-              <span class="sticker" id="sticker" aria-hidden="true"><i class="ph-fill ph-lock-simple"></i></span>
-              <span class="engrave" id="play-label" aria-hidden="true">Play</span>
-            </div>
-          </div>
-        </div>
+      <section class="sheet" aria-live="polite" aria-label="Selected disc">
+        <p class="sheet-code" id="code">DSC_01</p>
+        <h1 class="sheet-title" id="title"></h1>
+        <p class="sheet-text" id="text"></p>
+        <dl class="specs">
+          <div><dt>Kind</dt><dd id="kind"></dd></div>
+          <div><dt>Built with</dt><dd id="stack"></dd></div>
+          <div><dt>Access</dt><dd id="access"></dd></div>
+        </dl>
+        <button class="action" id="action" type="button"><span id="action-label">Open</span><span class="action-arrow" aria-hidden="true">&rarr;</span></button>
       </section>
     </main>
 
     <footer class="bottom">
-      <p>RAS G9. <span class="hint-desk">Scroll, use the arrow keys, or press 1 to 5 to change disc.</span><span class="hint-touch">Swipe the discs or tap one to change.</span></p>
-      <div class="quality">
-        <label class="q-label" for="quality">Quality</label>
-        <span class="q-end" aria-hidden="true">Pixel</span>
-        <input class="fader" id="quality" type="range" min="0" max="100" step="1" value="40">
-        <span class="q-end" aria-hidden="true">Cinema</span>
-      </div>
+      <p>RAS G9</p>
+      <p class="hint"><span class="hint-desk">Scroll, drag the disc, or press 1 to 5.</span><span class="hint-touch">Swipe the disc or tap a code.</span></p>
     </footer>
   </div>
 
-  <dialog class="liner" id="liner" aria-labelledby="liner-title">
-    <div class="booklet">
-      <section class="page page-cover">
-        <p class="cover-mark">Sabu</p>
-        <p class="cover-sub">5 Disc</p>
-        <img class="cover-disc" src="favicon.svg" alt="" width="128" height="128">
-        <ol class="tracklist" id="tracklist" aria-label="Track list"></ol>
-      </section>
-      <section class="page page-notes">
-        <h2 id="liner-title">Liner notes</h2>
-        <p class="liner-lead">RAS G9.</p>
-        <p>Five things I made, loaded into one changer. Four are still under wraps until the right code goes into the keypad.</p>
-        <dl class="credits">
-          <div><dt>Written and built by</dt><dd>Sabu</dd></div>
-          <div><dt>Languages</dt><dd>TypeScript, Python, Swift</dd></div>
-          <div><dt>Pixel icons</dt><dd>Three.js, rendered small and scaled up</dd></div>
-          <div><dt>Type</dt><dd>VT323, Silkscreen, Geist</dd></div>
-          <div><dt>Find me</dt><dd><a href="https://github.com/windowopner" target="_blank" rel="noopener">github.com/windowopner</a></dd></div>
-        </dl>
-        <button class="pill liner-close" id="liner-close" type="button" autofocus>Close</button>
-      </section>
+  <dialog class="panel info" id="info" aria-labelledby="info-title">
+    <div class="panel-head">
+      <h2 id="info-title">Info</h2>
+      <button class="link" id="info-close" type="button" autofocus>Close</button>
+    </div>
+    <p class="info-lead">RAS G9.</p>
+    <p>Five things I made, kept here as discs. Four stay sealed until the right code goes into the keypad.</p>
+    <ol class="info-list" id="info-list" aria-label="Discs"></ol>
+    <dl class="specs info-specs">
+      <div><dt>Built by</dt><dd>Sabu</dd></div>
+      <div><dt>Languages</dt><dd>TypeScript, Python, Swift</dd></div>
+      <div><dt>Discs</dt><dd>Three.js, rendered live</dd></div>
+      <div><dt>Elsewhere</dt><dd><a href="https://github.com/windowopner" target="_blank" rel="noopener">github.com/windowopner</a></dd></div>
+    </dl>
+  </dialog>
+
+  <dialog class="panel keypad" id="keypad" aria-labelledby="keypad-title">
+    <div class="panel-head">
+      <h2 id="keypad-title">Sealed disc</h2>
+      <button class="link" id="keypad-close" type="button">Close</button>
+    </div>
+    <div class="pad-display" aria-live="polite"><span id="pad-status">Code</span><span id="pad-code">--------</span></div>
+    <div class="pad-grid" id="pad-grid">
+      <button class="pad-key" type="button" data-k="1">1</button>
+      <button class="pad-key" type="button" data-k="2">2</button>
+      <button class="pad-key" type="button" data-k="3">3</button>
+      <button class="pad-key" type="button" data-k="4">4</button>
+      <button class="pad-key" type="button" data-k="5">5</button>
+      <button class="pad-key" type="button" data-k="6">6</button>
+      <button class="pad-key" type="button" data-k="7">7</button>
+      <button class="pad-key" type="button" data-k="8">8</button>
+      <button class="pad-key" type="button" data-k="9">9</button>
+      <button class="pad-key pad-fn" type="button" data-k="C" aria-label="Clear">C</button>
+      <button class="pad-key" type="button" data-k="0">0</button>
+      <button class="pad-key pad-ok" type="button" data-k="OK" disabled aria-label="Unlock">OK</button>
     </div>
   </dialog>
 
-  <div class="grade" aria-hidden="true"></div>
-  <div class="vignette" aria-hidden="true"></div>
-  <div class="letterbox" aria-hidden="true"><span></span><span></span></div>
-  <canvas class="film" id="film" aria-hidden="true"></canvas>
-  <span class="stamp" id="stamp" aria-hidden="true"></span>
-
   <noscript>
-    <ul class="fallback">
-      <li>Disc 1: redacted.</li>
-      <li>Undertone: a macOS background that moves with your music.</li>
-      <li>Disc 3: redacted.</li>
-      <li>Disc 4: redacted.</li>
-      <li>Disc 5: redacted.</li>
+    <ul class="noscript">
+      <li>DSC_01: sealed.</li>
+      <li>DSC_02, Undertone: a macOS background that moves with your music.</li>
+      <li>DSC_03: sealed.</li>
+      <li>DSC_04: sealed.</li>
+      <li>DSC_05: sealed.</li>
     </ul>
   </noscript>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
-  <script src="icons.js?v=202610132257" defer></script>
-  <script src="film.js?v=202610132257" defer></script>
-  <script src="orbit.js?v=202610132257" defer></script>
-  <script src="app.js?v=202610141200" defer></script>
+  <script type="module" src="app.js?v=202610150100"></script>
 </body>
 </html>

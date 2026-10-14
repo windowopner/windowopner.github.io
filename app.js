@@ -1,7 +1,7 @@
-// The player: a row of discs (however many are in DISCS), one clamp, one display.
-// Every disc except Undertone is redacted: the title and description are filler text
-// drawn as a mosaic, so the real wording never ships in the page source.
-// Locked discs carry no link at all, so there is nothing behind the password prompt to break into.
+// The archive: five discs, one in front. Every disc except Undertone is sealed: its title
+// and description are filler text drawn as a mosaic, so the real wording never ships in
+// the page source. Sealed discs carry no link at all; the real ones live encrypted in
+// locks.json and only appear after the keypad code decrypts them.
 const DISCS = [
   {
     title: "Velorum",
@@ -31,7 +31,7 @@ const DISCS = [
   {
     title: "Tempor Incididunt U",
     kind: "MCP server",
-    status: "archived", // shown next to the kind on the display, not in the narrow track list
+    status: "archived",
     stack: "Python, FastAPI",
     text: "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est.",
     url: null,
@@ -49,130 +49,97 @@ const DISCS = [
   },
 ];
 
+const VERSION = new URL(import.meta.url).searchParams.get("v") || "";
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const $ = (id) => document.getElementById(id);
-const discList = $("discs");
-const slots = $("slots");
-const glass = discList.parentElement;
-const clamp = $("clamp");
-const play = $("play");
-const playLabel = $("play-label");
-const stageWrap = $("stage-wrap");
+const pad = (n) => String(n).padStart(2, "0");
+const code = (i) => `DSC_${pad(i + 1)}`;
+const kindOf = (d) => (d.status ? `${d.kind}, ${d.status}` : d.kind);
 
 let index = 0;
-let hasIcons = false;
+let scene = null;
 
-const pad = (n) => String(n).padStart(2, "0");
-
-// Build discs and the 1-N indicator on the display.
-discList.style.setProperty("--n", DISCS.length);
-const discButtons = DISCS.map((d, i) => {
+// ── Index list (left column; a row of codes on phones) ───────────────
+const indexList = $("index-list");
+const indexButtons = DISCS.map((d, i) => {
   const li = document.createElement("li");
   const btn = document.createElement("button");
-  btn.className = "disc";
   btn.type = "button";
-  btn.setAttribute("aria-label", d.redacted ? `Disc ${i + 1}` : `Disc ${i + 1}: ${d.title}`);
-  btn.innerHTML = `
-    <span class="disc-face">
-      <span class="disc-label"><img alt="" width="56" height="56"></span>
-      <span class="disc-hub"></span>
-    </span>
-    <span class="disc-num">${pad(i + 1)}</span>`;
-  btn.style.setProperty("--i", i);
+  btn.className = "index-item";
+  btn.innerHTML = `<span class="index-code">${code(i)}</span><span class="index-kind"></span>`;
   btn.addEventListener("click", () => select(i));
-  btn.addEventListener("dblclick", openCurrent);
   li.appendChild(btn);
-  discList.appendChild(li);
-
-  const slot = document.createElement("li");
-  slot.textContent = i + 1;
-  slots.appendChild(slot);
+  indexList.appendChild(li);
   return btn;
 });
 
-// Pixel icons on the labels and on the stage.
-try {
-  if (window.THREE && window.Icons) {
-    Icons.init($("stage"));
-    Icons.thumbs().forEach((src, i) => { discButtons[i].querySelector("img").src = src; });
-    hasIcons = true;
-  }
-} catch (err) {
-  hasIcons = false;
-}
-
-function moveClamp() {
-  const btn = discButtons[index];
-  const g = glass.getBoundingClientRect();
-  const b = btn.getBoundingClientRect();
-  clamp.style.setProperty("--x", `${b.left - g.left + b.width / 2}px`);
-  clamp.style.setProperty("--disc-now", `${b.width}px`);
-}
-
-// Room theme: the clamp lifts off the disc, slides along the rail, then sets down.
-// Rapid changes keep it in the air until the last one lands.
-let landTimer = 0;
-let clampX = null;
-function travelClamp() {
-  const before = clampX;
-  moveClamp();
-  clampX = clamp.style.getPropertyValue("--x");
-  if (reducedMotion || before === null || before === clampX) return;
-  clamp.classList.add("lifted");
-  clearTimeout(landTimer);
-  landTimer = setTimeout(() => clamp.classList.remove("lifted"), 860);
-}
-
-// Disc spin with inertia: the selected disc spins up once it is clamped (or straight
-// away in space), and a disc that loses focus coasts to a stop instead of snapping back.
-const faces = discButtons.map((b) => b.querySelector(".disc-face"));
-const spins = DISCS.map(() => ({ angle: 0, speed: 0 }));
-const SPIN_SPEED = 140; // degrees per second
-let spinLast = 0;
-function spinLoop(now) {
-  requestAnimationFrame(spinLoop);
-  const dt = Math.min(0.05, (now - (spinLast || now)) / 1000);
-  spinLast = now;
-  if (reducedMotion || document.hidden) return;
-  const held = document.documentElement.dataset.theme !== "space" && clamp.classList.contains("lifted");
-  spins.forEach((s, i) => {
-    const goal = i === index && !held ? SPIN_SPEED : 0;
-    if (s.speed === 0 && goal === 0) return;
-    const rate = goal > s.speed ? 1.4 : 0.8; // spin up quicker than it winds down
-    s.speed += (goal - s.speed) * Math.min(1, dt * rate);
-    if (goal === 0 && s.speed < 1) s.speed = 0;
-    s.angle = (s.angle + s.speed * dt) % 360;
-    faces[i].style.transform = `rotate(${s.angle.toFixed(2)}deg)`;
+function refreshIndex() {
+  indexButtons.forEach((btn, i) => {
+    const d = DISCS[i];
+    btn.querySelector(".index-kind").textContent = d.redacted ? d.kind : `${d.title}, ${d.kind}`;
+    btn.setAttribute("aria-label", d.redacted ? `${code(i)}, sealed ${d.kind}` : `${code(i)}, ${d.title}`);
+    btn.setAttribute("aria-current", i === index ? "true" : "false");
   });
 }
-requestAnimationFrame(spinLoop);
 
-// The display scrambles briefly before settling, like a VFD redrawing.
-const GLYPHS = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789#*+";
-let scrambleTimer = 0;
-function writeDisplay(el, text) {
-  if (reducedMotion) { el.textContent = text; return; }
-  let step = 0;
-  const steps = 6;
-  const run = () => {
-    step++;
-    el.textContent = [...text].map((ch, k) => {
-      if (ch === " " || k < (step / steps) * text.length) return ch;
-      return GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-    }).join("");
-    if (step < steps) scrambleTimer = setTimeout(run, 40);
-  };
-  run();
+// ── Dial: a ring of ticks around the disc. It turns so the selected disc's mark
+//    sits under the pointer at the top. ────────────────────────────────
+const dial = $("dial");
+const SVG = "http://www.w3.org/2000/svg";
+const dialRing = document.createElementNS(SVG, "g");
+dialRing.setAttribute("class", "dial-ring");
+for (let deg = 0; deg < 360; deg += 2) {
+  const major = deg % 30 === 0;
+  const t = document.createElementNS(SVG, "line");
+  t.setAttribute("x1", "0");
+  t.setAttribute("x2", "0");
+  t.setAttribute("y1", String(-94));
+  t.setAttribute("y2", String(major ? -89 : -91.5));
+  t.setAttribute("class", major ? "tick tick-major" : "tick");
+  t.setAttribute("transform", `rotate(${deg})`);
+  dialRing.appendChild(t);
+}
+const STEP = 360 / DISCS.length;
+const dialMarks = DISCS.map((d, i) => {
+  const g = document.createElementNS(SVG, "g");
+  g.setAttribute("transform", `rotate(${i * STEP})`);
+  const line = document.createElementNS(SVG, "line");
+  line.setAttribute("x1", "0");
+  line.setAttribute("x2", "0");
+  line.setAttribute("y1", "-96");
+  line.setAttribute("y2", "-86");
+  line.setAttribute("class", "dial-mark");
+  const label = document.createElementNS(SVG, "text");
+  label.setAttribute("x", "0");
+  label.setAttribute("y", "-80");
+  label.setAttribute("class", "mark-num");
+  label.textContent = pad(i + 1);
+  g.append(line, label);
+  dialRing.appendChild(g);
+  return g;
+});
+const pointer = document.createElementNS(SVG, "path");
+pointer.setAttribute("d", "M -2.4 -99.5 L 2.4 -99.5 L 0 -95.5 Z");
+pointer.setAttribute("class", "pointer");
+dial.append(dialRing, pointer);
+let dialAngle = 0;
+
+function turnDial() {
+  // Take the short way round.
+  const goal = -index * STEP;
+  let delta = ((goal - dialAngle) % 360 + 540) % 360 - 180;
+  dialAngle += delta;
+  dialRing.style.transform = `rotate(${dialAngle}deg)`;
+  dialMarks.forEach((g, i) => g.classList.toggle("on", i === index));
 }
 
-// Draw text at full size, shrink it so neighbouring pixels average out, then scale it
-// back up with hard edges. Alpha is boosted so thin strokes still read as solid blocks.
+// ── Mosaic: draw text, shrink it, scale it back up with hard edges ───
 function mosaic(el, text, block, singleLine) {
   const cs = getComputedStyle(el);
-  const font = `${cs.fontSize} ${cs.fontFamily}`;
+  const font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
   const size = parseFloat(cs.fontSize);
   const lineHeight = parseFloat(cs.lineHeight) || size * 1.3;
-  const maxWidth = singleLine ? Infinity : el.clientWidth || 420;
+  const maxWidth = singleLine ? Infinity : el.clientWidth || 360;
 
   const measure = document.createElement("canvas").getContext("2d");
   measure.font = font;
@@ -200,7 +167,6 @@ function mosaic(el, text, block, singleLine) {
   small.width = Math.ceil(w / block);
   small.height = Math.ceil(h / block);
   const s = small.getContext("2d");
-  s.imageSmoothingEnabled = true;
   s.drawImage(full, 0, 0, small.width, small.height);
   const img = s.getImageData(0, 0, small.width, small.height);
   for (let i = 3; i < img.data.length; i += 4) img.data[i] = Math.min(255, img.data[i] * 2.4);
@@ -210,110 +176,160 @@ function mosaic(el, text, block, singleLine) {
   small.style.width = `${small.width * block}px`;
   small.style.height = `${small.height * block}px`;
   small.setAttribute("aria-hidden", "true");
-
   const label = document.createElement("span");
   label.className = "sr-only";
-  label.textContent = "Redacted";
+  label.textContent = "Sealed";
   el.replaceChildren(small, label);
 }
+
+// ── Disc labels: ink printed on the mirrored face ────────────────────
+const INK = "#16181d";
+const ACCENT = "#e0442d";
+function drawLabel(i, ctx, size) {
+  const d = DISCS[i];
+  const c = size / 2;
+  const R = (r) => (r / 0.985) * c; // disc units to canvas pixels
+  ctx.save();
+  ctx.translate(c, c);
+
+  // Rings
+  ctx.strokeStyle = INK;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 2;
+  [R(0.86), R(0.36)].forEach((r) => { ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke(); });
+
+  // Text running round the rim
+  const rim = `SABU ARCHIVE   ${code(i)}   ${kindOf(d).toUpperCase()}   `;
+  const repeated = rim.repeat(3);
+  ctx.globalAlpha = 0.75;
+  ctx.fillStyle = INK;
+  ctx.font = `500 ${Math.round(size * 0.022)}px "Geist Mono", ui-monospace, monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const rr = R(0.92);
+  const per = (Math.PI * 2) / repeated.length;
+  [...repeated].forEach((ch, k) => {
+    ctx.save();
+    ctx.rotate(k * per - Math.PI / 2);
+    ctx.translate(0, -rr);
+    ctx.fillText(ch, 0, 0);
+    ctx.restore();
+  });
+
+  // Code, large, above the hole
+  ctx.globalAlpha = 0.92;
+  ctx.font = `600 ${Math.round(size * 0.1)}px "Geist", ui-sans-serif, sans-serif`;
+  ctx.fillText(code(i), 0, -R(0.6));
+
+  // Title below the hole, or a redaction bar
+  if (d.redacted) {
+    const w = Math.min(R(1.05), d.title.length * size * 0.026);
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(-w / 2, R(0.52), w, size * 0.05);
+  } else {
+    ctx.font = `500 ${Math.round(size * 0.058)}px "Geist", ui-sans-serif, sans-serif`;
+    ctx.fillText(d.title, 0, R(0.56));
+  }
+  ctx.globalAlpha = 0.7;
+  ctx.font = `400 ${Math.round(size * 0.026)}px "Geist Mono", ui-monospace, monospace`;
+  ctx.fillText(d.locked ? "SEALED" : d.url ? "OPEN" : "PRIVATE", 0, R(0.71));
+
+  // One red index mark at twelve o'clock
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = ACCENT;
+  ctx.fillRect(-size * 0.006, -R(0.86) - size * 0.03, size * 0.012, size * 0.03);
+  ctx.restore();
+}
+
+// ── The sheet on the right ───────────────────────────────────────────
+const action = $("action");
+const actionLabel = $("action-label");
 
 function select(i) {
   index = (i + DISCS.length) % DISCS.length;
   const d = DISCS[index];
+  refreshIndex();
+  turnDial();
+  scene?.setIndex(index);
+  fallbackSpin();
 
-  discButtons.forEach((b, k) => b.setAttribute("aria-current", k === index ? "true" : "false"));
-  [...slots.children].forEach((s, k) => s.classList.toggle("on", k === index));
-  travelClamp();
-
-  clearTimeout(scrambleTimer);
-  $("track").textContent = pad(index + 1);
-  $("kind").textContent = d.status ? `${d.kind} · ${d.status}` : d.kind;
+  $("code").textContent = code(index);
   if (d.redacted) {
-    mosaic($("title"), d.title.toUpperCase(), 6, true);
-    mosaic($("desc"), d.text, 5, false);
+    mosaic($("title"), d.title, 7, true);
+    mosaic($("text"), d.text, 5, false);
   } else {
-    writeDisplay($("title"), d.title.toUpperCase());
-    $("desc").textContent = d.text;
+    $("title").textContent = d.title;
+    $("text").textContent = d.text;
   }
+  $("kind").textContent = kindOf(d);
   $("stack").textContent = d.stack;
+  $("access").textContent = d.url ? "Open" : d.locked ? "Sealed, needs a code" : "Private";
 
-  closePad();
-  if (window.Orbit) Orbit.focus(index);
-  play.classList.toggle("locked", Boolean(d.locked));
-  if (!d.locked) play.removeAttribute("aria-expanded");
+  action.classList.toggle("is-locked", Boolean(d.locked));
   if (d.url) {
-    play.removeAttribute("aria-disabled");
-    play.setAttribute("aria-label", `Open ${d.title}`);
-    play.innerHTML = '<i class="ph ph-play" aria-hidden="true"></i>';
-    playLabel.textContent = "Play";
+    action.disabled = false;
+    actionLabel.textContent = "Open project";
+    action.setAttribute("aria-label", `Open ${d.title} in a new tab`);
   } else if (d.locked) {
-    play.removeAttribute("aria-disabled");
-    play.setAttribute("aria-label", `Disc ${index + 1} is locked. Open keypad`);
-    play.setAttribute("aria-expanded", "false");
-    play.innerHTML = '<i class="ph ph-play" aria-hidden="true"></i>';
-    playLabel.textContent = "Locked";
+    action.disabled = false;
+    actionLabel.textContent = "Enter code";
+    action.setAttribute("aria-label", `${code(index)} is sealed. Enter the code`);
   } else {
-    play.setAttribute("aria-disabled", "true");
-    play.setAttribute("aria-label", d.redacted ? `Disc ${index + 1} is private for now` : `${d.title} is private for now`);
-    play.innerHTML = '<i class="ph ph-lock-simple" aria-hidden="true"></i>';
-    playLabel.textContent = "Private";
-  }
-
-  if (hasIcons) {
-    Icons.show(index);
-    stageWrap.classList.remove("switching");
-    void stageWrap.offsetWidth;
-    stageWrap.classList.add("switching");
+    action.disabled = true;
+    actionLabel.textContent = "Private for now";
+    action.removeAttribute("aria-label");
   }
 }
 
-function openCurrent() {
+function activate() {
   const d = DISCS[index];
   if (d.url) window.open(d.url, "_blank", "noopener");
   else if (d.locked) openPad();
 }
 
-// Keypad for locked discs. One code opens every locked disc: locks.json holds their
-// real title, text, and link, encrypted (PBKDF2-SHA256 + AES-GCM) with that code by
-// tools/lock.mjs. A wrong code simply fails to decrypt; nothing secret is in the page.
-const controls = $("controls");
-const hatch = $("hatch");
-const okKey = hatch.querySelector('[data-k="OK"]');
+action.addEventListener("click", activate);
+$("prev").addEventListener("click", () => select(index - 1));
+$("next").addEventListener("click", () => select(index + 1));
+
+// ── Keypad. One code opens every sealed disc: locks.json holds their real title,
+//    text, and link, encrypted (PBKDF2-SHA256 + AES-GCM) by tools/lock.mjs. A wrong
+//    code simply fails to decrypt; nothing secret is in the page. ─────────
+const keypad = $("keypad");
+const okKey = keypad.querySelector('[data-k="OK"]');
 const MAX_CODE = 12;
-let code = "";
-let locks = null;     // encrypted blob, once fetched
-let busy = false;     // decrypting
+let entry = "";
+let locks = null;
+let busy = false;
 let failures = 0;
 let waitUntil = 0;
 
-fetch(`locks.json?v=${document.querySelector('script[src^="app.js"]').src.split("v=")[1] || ""}`)
+fetch(`locks.json?v=${VERSION}`)
   .then((r) => (r.ok ? r.json() : null))
   .then((data) => { locks = data; showCode(); })
   .catch(() => { locks = null; });
 
 function padStatus(left, right) {
-  $("pad-disc").textContent = left;
+  $("pad-status").textContent = left;
   $("pad-code").textContent = right;
 }
 
 function showCode() {
-  const shown = "*".repeat(Math.min(code.length, 8)) + (code.length > 8 ? "+" : "");
-  padStatus(locks ? "Code" : "Locked", code ? shown.padEnd(8, "-") : "--------");
-  okKey.disabled = !locks || busy || code.length < 4;
-  okKey.setAttribute("aria-label", locks ? "Unlock" : "Unlock, not available");
+  const shown = "*".repeat(Math.min(entry.length, 8)) + (entry.length > 8 ? "+" : "");
+  padStatus(locks ? "Code" : "Unavailable", entry ? shown.padEnd(8, "-") : "--------");
+  okKey.disabled = !locks || busy || entry.length < 4;
 }
 
 function openPad() {
-  if (controls.classList.contains("open")) return;
-  code = "";
+  entry = "";
   showCode();
-  controls.classList.add("open");
-  hatch.inert = false;
-  play.setAttribute("aria-expanded", "true");
+  keypad.showModal();
 }
 
-const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+function closePad() {
+  if (keypad.open) keypad.close();
+}
 
+const b64 = (s) => Uint8Array.from(atob(s), (ch) => ch.charCodeAt(0));
 async function decrypt(pin) {
   const { subtle } = crypto;
   const base = await subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveKey"]);
@@ -328,19 +344,18 @@ async function decrypt(pin) {
   return JSON.parse(new TextDecoder().decode(plain));
 }
 
-// Swap the redacted discs for the real ones.
 function applyUnlock(payload) {
   Object.entries(payload).forEach(([k, real]) => {
     const i = Number(k);
     if (!DISCS[i]) return;
     DISCS[i] = { ...DISCS[i], ...real, redacted: false, locked: false };
-    discButtons[i].setAttribute("aria-label", `Disc ${i + 1}: ${DISCS[i].title}`);
+    scene?.setLabel(i);
   });
-  document.dispatchEvent(new Event("discs-unlocked"));
+  if (info.open) fillInfo();
 }
 
 async function submitCode() {
-  if (!locks || busy || code.length < 4) return;
+  if (!locks || busy || entry.length < 4) return;
   const now = Date.now();
   if (now < waitUntil) {
     padStatus("Wait", `${Math.ceil((waitUntil - now) / 1000)}s`.padStart(8, " "));
@@ -351,41 +366,53 @@ async function submitCode() {
   let dots = 0;
   const reading = setInterval(() => padStatus("Reading", ".".repeat((dots++ % 3) + 1).padEnd(8, " ")), 160);
   try {
-    const payload = await decrypt(code);
+    const payload = await decrypt(entry);
     clearInterval(reading);
     try { sessionStorage.setItem("unlocked-v2", JSON.stringify(payload)); } catch (err) { /* storage blocked */ }
-    padStatus("Open", "  ok");
+    padStatus("Open", "      ok");
     failures = 0;
     setTimeout(() => {
       busy = false;
       closePad();
-      peelSticker();
       applyUnlock(payload);
-      setTimeout(() => select(index), reducedMotion ? 0 : 420);
-    }, 380);
+      select(index);
+    }, 420);
   } catch (err) {
     clearInterval(reading);
     busy = false;
     failures++;
     // Back off after a few misses: 1s, 2s, 4s, ... up to 30s.
     if (failures >= 3) waitUntil = Date.now() + Math.min(30000, 1000 * 2 ** (failures - 3));
-    code = "";
-    padStatus("Wrong", "  code");
-    hatch.classList.remove("shake");
-    void hatch.offsetWidth;
-    hatch.classList.add("shake");
+    entry = "";
+    padStatus("Wrong", "    code");
+    keypad.classList.remove("shake");
+    void keypad.offsetWidth;
+    keypad.classList.add("shake");
     setTimeout(showCode, 900);
   }
 }
 
-function peelSticker() {
-  const sticker = $("sticker");
-  if (reducedMotion) return;
-  sticker.classList.remove("peel");
-  void sticker.offsetWidth;
-  sticker.classList.add("peel");
-  setTimeout(() => sticker.classList.remove("peel"), 700);
+function pressPad(k) {
+  if (busy) return;
+  if (k === "OK") { submitCode(); return; }
+  if (k === "C") entry = "";
+  else if (/^\d$/.test(k) && entry.length < MAX_CODE) entry += k;
+  showCode();
 }
+
+function flashKey(k) {
+  const key = keypad.querySelector(`[data-k="${k}"]`);
+  if (!key) return;
+  key.classList.add("pressed");
+  setTimeout(() => key.classList.remove("pressed"), 120);
+}
+
+$("pad-grid").addEventListener("click", (e) => {
+  const key = e.target.closest(".pad-key");
+  if (key && !key.disabled) pressPad(key.dataset.k);
+});
+$("keypad-close").addEventListener("click", closePad);
+keypad.addEventListener("click", (e) => { if (e.target === keypad) closePad(); });
 
 // Already unlocked earlier in this tab: restore quietly.
 try {
@@ -393,116 +420,59 @@ try {
   if (saved) applyUnlock(JSON.parse(saved));
 } catch (err) { /* storage blocked or bad data */ }
 
-function closePad() {
-  if (!controls.classList.contains("open")) return;
-  controls.classList.remove("open");
-  hatch.inert = true;
-  if (play.hasAttribute("aria-expanded")) play.setAttribute("aria-expanded", "false");
-}
-
-function pressPad(k) {
-  if (busy) return;
-  if (k === "OK") { submitCode(); return; }
-  if (k === "C") code = "";
-  else if (/^\d$/.test(k) && code.length < MAX_CODE) code += k;
-  showCode();
-}
-
-play.addEventListener("click", () => {
-  if (controls.classList.contains("open")) closePad();
-  else openCurrent();
-});
-hatch.addEventListener("click", (e) => {
-  const key = e.target.closest(".pad-key");
-  if (key && !key.disabled) pressPad(key.dataset.k);
-});
-
-function flashKey(k) {
-  const key = hatch.querySelector(`[data-k="${k}"]`);
-  if (!key) return;
-  key.classList.add("pressed");
-  setTimeout(() => key.classList.remove("pressed"), 120);
-}
-
-$("prev").addEventListener("click", () => select(index - 1));
-$("next").addEventListener("click", () => select(index + 1));
-
-// Liner notes: a booklet that slides out of the case.
-const liner = $("liner");
-const tracklist = $("tracklist");
-
-function fillTracklist() {
-  tracklist.replaceChildren(...DISCS.map((d, i) => {
+// ── Info panel ───────────────────────────────────────────────────────
+const info = $("info");
+function fillInfo() {
+  $("info-list").replaceChildren(...DISCS.map((d, i) => {
     const li = document.createElement("li");
-    const num = document.createElement("span");
-    num.className = "track-num";
-    num.textContent = pad(i + 1);
+    const c = document.createElement("span");
+    c.className = "info-code";
+    c.textContent = code(i);
     const name = document.createElement("span");
-    if (d.redacted) {
-      name.className = "redact";
-      name.style.setProperty("--len", d.title.length);
-      name.textContent = "Redacted";
-    } else {
-      name.textContent = d.title;
-    }
+    name.textContent = d.redacted ? "Sealed" : d.title;
+    if (d.redacted) name.className = "info-sealed";
     const kind = document.createElement("span");
-    kind.className = "track-kind";
+    kind.className = "info-kind";
     kind.textContent = d.kind;
-    li.append(num, name, kind);
+    li.append(c, name, kind);
     return li;
   }));
 }
+function openInfo() { fillInfo(); info.showModal(); }
+$("info-btn").addEventListener("click", openInfo);
+$("info-close").addEventListener("click", () => info.close());
+info.addEventListener("click", (e) => { if (e.target === info) info.close(); });
+// Old links to the liner notes (#notes) land on Info.
+if (location.hash === "#info" || location.hash === "#notes") requestAnimationFrame(openInfo);
 
-function openLiner() {
-  fillTracklist();
-  liner.showModal();
-  requestAnimationFrame(() => liner.classList.add("in"));
-}
-
-function closeLiner() {
-  if (!liner.open) return;
-  liner.classList.remove("in");
-  setTimeout(() => liner.close(), reducedMotion ? 0 : 280);
-}
-
-$("notes-btn").addEventListener("click", openLiner);
-$("liner-close").addEventListener("click", closeLiner);
-liner.addEventListener("cancel", (e) => { e.preventDefault(); closeLiner(); });
-liner.addEventListener("click", (e) => { if (e.target === liner) closeLiner(); });
-document.addEventListener("discs-unlocked", () => { if (liner.open) fillTracklist(); });
-// Linking to #notes opens the booklet straight away.
-if (location.hash === "#notes") requestAnimationFrame(openLiner);
-
-// Keyboard: arrows step, number keys jump straight to a disc, Enter plays.
+// ── Keyboard: arrows step, number keys jump, Enter opens ─────────────
 window.addEventListener("keydown", (e) => {
-  if (e.metaKey || e.ctrlKey || e.altKey || liner.open) return;
-  if (e.target instanceof HTMLInputElement && e.target.name === "theme") return; // arrows move the theme switch
-  // While the keypad is open, number keys type into it instead of changing disc.
-  if (controls.classList.contains("open")) {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (keypad.open) {
     if (/^\d$/.test(e.key)) { pressPad(e.key); flashKey(e.key); return; }
-    if (e.key === "Backspace") { code = code.slice(0, -1); showCode(); return; }
-    if (e.key === "Escape") { closePad(); play.focus(); return; }
-    if (e.key === "Enter") { e.preventDefault(); pressPad("OK"); flashKey("OK"); return; }
+    if (e.key === "Backspace") { entry = entry.slice(0, -1); showCode(); return; }
+    if (e.key === "Enter") { e.preventDefault(); pressPad("OK"); flashKey("OK"); }
+    return;
   }
+  if (info.open || document.documentElement.classList.contains("opening")) return;
   if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); select(index + 1); }
   else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); select(index - 1); }
   else if (/^[1-9]$/.test(e.key) && Number(e.key) <= DISCS.length) select(Number(e.key) - 1);
-  else if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement)) openCurrent();
+  else if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement)) activate();
 });
 
-// Wheel: one disc per gesture on screens where the page itself does not scroll.
-// A trackpad flick keeps sending fading inertial events for a second or so; those
-// are swallowed. A new push shows up as deltas climbing again after they had
-// clearly faded (or as a reversal),
-// and each mouse-wheel notch arrives after a pause, so both count as new gestures.
-const fixedLayout = window.matchMedia("(min-width: 900px) and (min-height: 700px)");
+// ── Wheel: one disc per gesture where the page itself doesn't scroll ──
+// A trackpad flick keeps sending fading inertial events for a second or so; those are
+// swallowed. A new push shows up as deltas climbing again after they had clearly faded
+// (or as a reversal), and each mouse-wheel notch arrives after a pause.
+const fixedLayout = window.matchMedia("(min-width: 900px) and (min-height: 640px)");
 let wheelSum = 0;
 let wheelLocked = false;
-let wheelPeak = 0;   // biggest delta since the last step
-let wheelTrough = 0; // smallest delta after that peak
+let wheelPeak = 0;
+let wheelTrough = 0;
 let wheelIdle = 0;
 window.addEventListener("wheel", (e) => {
-  if (!fixedLayout.matches || controls.classList.contains("open") || liner.open) return;
+  if (!fixedLayout.matches || keypad.open || info.open) return;
   e.preventDefault();
   const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
   const size = Math.abs(delta);
@@ -526,156 +496,67 @@ window.addEventListener("wheel", (e) => {
   }
 }, { passive: false });
 
-// Horizontal swipe on the deck.
-let swipeX = null;
-const deck = $("deck");
-deck.addEventListener("pointerdown", (e) => { swipeX = e.clientX; });
-deck.addEventListener("pointerup", (e) => {
-  if (swipeX === null || document.documentElement.dataset.theme === "space") { swipeX = null; return; }
-  const dx = e.clientX - swipeX;
-  swipeX = null;
-  if (Math.abs(dx) > 50) select(index + (dx < 0 ? 1 : -1));
-});
-
-new ResizeObserver(() => { moveClamp(); clampX = clamp.style.getPropertyValue("--x"); }).observe(glass);
-
-// Re-wrap the mosaic when the description column changes width.
-let wrapWidth = 0;
-new ResizeObserver(([entry]) => {
-  const width = Math.round(entry.contentRect.width);
-  if (width !== wrapWidth && DISCS[index].redacted) mosaic($("desc"), DISCS[index].text, 5, false);
-  wrapWidth = width;
-}).observe($("desc"));
-
-// Date stamp, like an old digital camera.
-const now = new Date();
-$("stamp").textContent = `'${String(now.getFullYear()).slice(2)} ${pad(now.getMonth() + 1)} ${pad(now.getDate())}`;
-
-// Canvas text needs the web fonts, so wait for them before the first draw.
-document.fonts.ready.then(() => {
-  if (!document.documentElement.classList.contains("booting")) select(index);
-});
-// Themes. The choice is remembered per browser when storage is available.
-const THEMES = ["room", "space"];
-const themeSwitch = $("theme-switch");
-const room = document.querySelector(".room");
-
-function applyTheme(name) {
-  const theme = THEMES.includes(name) ? name : "room";
-  document.documentElement.dataset.theme = theme;
-  themeSwitch.style.setProperty("--i", THEMES.indexOf(theme));
-  $(`theme-${theme}`).checked = true;
-  closePad();
-  if (theme === "space" && window.Orbit) Orbit.start(index);
-  else if (window.Orbit) Orbit.stop();
-  moveClamp();
-  clampX = clamp.style.getPropertyValue("--x");
-  try { localStorage.setItem("theme", theme); } catch (err) { /* storage blocked */ }
+// ── No WebGL: a flat iridescent disc stands in ───────────────────────
+const fallback = $("fallback-disc");
+function fallbackSpin() {
+  if (scene || reducedMotion) return;
+  fallback.classList.remove("swap");
+  void fallback.offsetWidth;
+  fallback.classList.add("swap");
 }
 
-themeSwitch.addEventListener("change", (e) => {
-  const next = e.target.value;
-  if (reducedMotion) { applyTheme(next); return; }
-  // Fade to black, swap reels, fade back up.
+async function startScene() {
+  try {
+    await Promise.race([
+      Promise.all([document.fonts.load('600 40px "Geist"'), document.fonts.load('500 20px "Geist Mono"')]),
+      new Promise((r) => setTimeout(r, 1500)),
+    ]);
+    const { create } = await import(`./scene.js?v=${VERSION}`);
+    scene = create($("scene"), {
+      count: DISCS.length,
+      label: drawLabel,
+      onSelect: select,
+      onActivate: activate,
+      holdIntro: document.documentElement.classList.contains("opening"),
+    });
+    scene.setIndex(index);
+    document.documentElement.classList.add("has-scene");
+    return true;
+  } catch (err) {
+    console.warn("3D view unavailable, showing a flat disc instead.", err);
+    document.documentElement.classList.add("no-scene");
+    return false;
+  }
+}
+
+// ── Opening: a dark title card that draws the name, then lifts away ──
+function runOpening() {
   const root = document.documentElement;
-  root.classList.add("cut");
-  setTimeout(() => {
-    applyTheme(next);
-    requestAnimationFrame(() => root.classList.remove("cut"));
-  }, 320);
-});
-
-// ?theme=space in the address wins, so a theme can be linked directly.
-let savedTheme = new URLSearchParams(location.search).get("theme");
-if (!savedTheme) {
-  try { savedTheme = localStorage.getItem("theme") || "room"; } catch (err) { savedTheme = "room"; }
+  const opening = $("opening");
+  if (!root.classList.contains("opening")) { opening.remove(); return Promise.resolve(); }
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      try { localStorage.setItem("opening-seen", "1"); } catch (err) { /* storage blocked */ }
+      opening.classList.add("leave");
+      root.classList.remove("opening");
+      resolve();
+      setTimeout(() => opening.remove(), 900);
+    };
+    $("opening-skip").addEventListener("click", finish);
+    opening.addEventListener("click", finish);
+    window.addEventListener("keydown", (e) => { if (e.key === "Escape" || e.key === "Enter") finish(); }, { once: true });
+    document.fonts.ready.then(() => {
+      opening.classList.add("run");
+      setTimeout(finish, 2300);
+    });
+  });
 }
-
-// Dragging the ring in space hands the disc it settles on back to the player.
-if (window.Orbit) Orbit.onSelect = (i) => { if (i !== index) select(i); };
 
 select(0);
-applyTheme(savedTheme);
-if (hasIcons) Icons.start({ reducedMotion });
-
-// Quality fader: pixel art on the left, the original look at 40, cinema on the right.
-// Cheap visual changes (letterbox, grade, bloom) follow the fader live; re-rendering
-// work waits for the fader to settle, and disc labels are redrawn on release.
-const fader = $("quality");
-let qualityTimer = 0;
-function qualityName(q) {
-  return q < 0.25 ? "pixel" : q > 0.7 ? "cinema" : "film";
-}
-function applyQuality(q, { heavy = true, labels = false } = {}) {
-  const root = document.documentElement;
-  const cine = Math.max(0, (q - 0.6) / 0.4);
-  root.style.setProperty("--q", q.toFixed(3));
-  root.style.setProperty("--cine", cine.toFixed(3));
-  root.dataset.quality = qualityName(q);
-  fader.style.setProperty("--fill", `${(q * 100).toFixed(1)}%`);
-  fader.setAttribute("aria-valuetext", `${Math.round(q * 100)}, ${qualityName(q)}`);
-  if (!heavy) return;
-  clearTimeout(qualityTimer);
-  qualityTimer = setTimeout(() => {
-    if (hasIcons) Icons.setQuality(q);
-    if (window.Orbit) Orbit.setQuality(q);
-    if (window.Film) Film.setQuality(q);
-    if (labels && hasIcons) Icons.thumbs().forEach((src, i) => { discButtons[i].querySelector("img").src = src; });
-  }, 90);
-}
-fader.addEventListener("input", () => applyQuality(fader.value / 100));
-fader.addEventListener("change", () => {
-  const q = fader.value / 100;
-  applyQuality(q, { labels: true });
-  try { localStorage.setItem("quality", String(fader.value)); } catch (err) { /* storage blocked */ }
+const sceneReady = startScene();
+runOpening().then(async () => {
+  if (await sceneReady) scene.intro();
 });
-fader.addEventListener("keydown", (e) => e.stopPropagation()); // arrows move the fader, not the discs
-{
-  let saved = new URLSearchParams(location.search).get("quality");
-  if (saved === null) { try { saved = localStorage.getItem("quality"); } catch (err) { saved = null; } }
-  const v = Math.max(0, Math.min(100, Number(saved ?? 40)));
-  fader.value = Number.isFinite(v) ? v : 40;
-  applyQuality(fader.value / 100, { labels: true });
-}
-
-// Power-on intro, first visit only: lights come up, the display says hello,
-// discs load one by one, and the clamp sets down on disc 1. Any key or click skips it.
-(function boot() {
-  const root = document.documentElement;
-  let seen = false;
-  try { seen = localStorage.getItem("booted") === "1"; } catch (err) { seen = false; }
-  const params = new URLSearchParams(location.search);
-  if ((seen && !params.has("intro")) || reducedMotion || params.has("nointro")) return;
-
-  const timers = [];
-  const at = (ms, fn) => timers.push(setTimeout(fn, ms));
-  let done = false;
-
-  root.classList.add("booting");
-  clamp.classList.add("lifted");
-  $("track").textContent = "--";
-  $("title").textContent = "HELLO";
-  $("kind").textContent = "";
-
-  function finish() {
-    if (done) return;
-    done = true;
-    timers.forEach(clearTimeout);
-    root.classList.remove("booting", "power");
-    root.classList.add("loading");
-    setTimeout(() => root.classList.remove("loading"), 1200);
-    $("title").classList.remove("blink");
-    select(index);
-    setTimeout(() => clamp.classList.remove("lifted"), 260);
-    window.removeEventListener("keydown", skip, true);
-    window.removeEventListener("pointerdown", skip, true);
-    try { localStorage.setItem("booted", "1"); } catch (err) { /* storage blocked */ }
-  }
-  function skip() { finish(); }
-
-  at(250, () => { root.classList.add("power"); $("title").classList.add("blink"); });
-  at(1250, () => { if (window.Orbit) Orbit.kick(0.35); });
-  at(1250, finish);
-  window.addEventListener("keydown", skip, true);
-  window.addEventListener("pointerdown", skip, true);
-})();
