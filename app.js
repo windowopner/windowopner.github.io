@@ -656,8 +656,9 @@ info.addEventListener("close", () => muffleCheck());
 $("info-btn").addEventListener("click", openInfo);
 $("info-close").addEventListener("click", () => info.close());
 info.addEventListener("click", (e) => { if (e.target === info) info.close(); });
-// Old links to the liner notes (#notes) land on Info.
-if (location.hash === "#info" || location.hash === "#notes") requestAnimationFrame(openInfo);
+// #about opens the panel; older #info and #notes links land there too.
+if (["#about", "#info", "#notes"].includes(location.hash)) requestAnimationFrame(openInfo);
+$("year").textContent = new Date().getFullYear();
 
 // ── Keyboard: arrows step, number keys jump, Enter opens ─────────────
 window.addEventListener("keydown", (e) => {

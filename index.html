@@ -3,24 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sabu</title>
-  <meta name="description" content="Sabu's projects, kept as an archive of discs.">
+  <title>Sabu — Developer</title>
+  <meta name="description" content="Sabu builds web apps, macOS tools, and real-time 3D for the browser. Five projects, kept as an archive of discs.">
+  <meta name="author" content="Sabu">
+  <link rel="canonical" href="https://windowopner.github.io/">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#eceff3">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://windowopner.github.io/">
-  <meta property="og:title" content="Sabu">
-  <meta property="og:description" content="Five projects, kept as an archive of discs.">
+  <meta property="og:title" content="Sabu — Developer">
+  <meta property="og:description" content="Web apps, macOS tools, and real-time 3D. Five projects, kept as an archive of discs.">
   <meta property="og:image" content="https://windowopner.github.io/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "name": "Sabu",
+      "url": "https://windowopner.github.io/",
+      "jobTitle": "Developer",
+      "sameAs": ["https://github.com/windowopner"],
+      "knowsAbout": ["TypeScript", "Python", "Swift", "Next.js", "Three.js", "WebGL", "Web Audio", "macOS"]
+    }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=202610150600">
+  <link rel="stylesheet" href="style.css?v=202610151200">
   <script type="importmap">
     {
       "imports": {
@@ -53,10 +66,13 @@
 
   <div class="shell">
     <header class="top">
-      <a class="mark" href="./">Sabu</a>
+      <div class="brand">
+        <a class="mark" href="./">Sabu</a>
+        <p class="role">Developer <span aria-hidden="true">/</span> Web, macOS, real-time 3D</p>
+      </div>
       <nav class="top-nav" aria-label="Site">
         <button class="link sound-btn" id="sound-btn" type="button" aria-pressed="false" title="Sound (M)"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="sound-label">Sound off</span></button>
-        <button class="link" id="info-btn" type="button" aria-haspopup="dialog">Info</button>
+        <button class="link" id="info-btn" type="button" aria-haspopup="dialog">About</button>
         <a class="link" href="https://github.com/windowopner" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </header>
@@ -95,24 +111,34 @@
     </main>
 
     <footer class="bottom">
-      <p>RAS G9</p>
+      <p>&copy; <span id="year">2026</span> Sabu <span aria-hidden="true">&middot;</span> RAS G9</p>
       <p class="hint"><span class="hint-desk">Scroll or drag to change disc. Hold one to spin it.</span><span class="hint-touch">Swipe to change disc. Hold one to spin it.</span></p>
     </footer>
   </div>
 
   <dialog class="panel info" id="info" aria-labelledby="info-title">
     <div class="panel-head">
-      <h2 id="info-title">Info</h2>
+      <h2 id="info-title">About</h2>
       <button class="link" id="info-close" type="button" autofocus>Close</button>
     </div>
-    <p class="info-lead">RAS G9.</p>
-    <p>Five things I made, kept here as discs. Four stay sealed until the right code goes into the keypad.</p>
+    <p class="info-lead">I'm Sabu. I build web apps, macOS tools, and interactive 3D for the browser.</p>
+    <p>I like small, finished things with a lot of care in the details. This site is one of them: the discs, the lighting, and the music are all rendered live in your browser, with no build step.</p>
+
+    <h3 class="info-head">Selected work</h3>
+    <p class="info-note">Four projects are sealed until the right code goes into the keypad.</p>
     <ol class="info-list" id="info-list" aria-label="Discs"></ol>
+
+    <h3 class="info-head">Toolkit</h3>
     <dl class="specs info-specs">
-      <div><dt>Built by</dt><dd>Sabu</dd></div>
-      <div><dt>Languages</dt><dd>TypeScript, Python, Swift</dd></div>
-      <div><dt>Discs</dt><dd>Three.js, rendered live</dd></div>
-      <div><dt>Elsewhere</dt><dd><a href="https://github.com/windowopner" target="_blank" rel="noopener">github.com/windowopner</a></dd></div>
+      <div><dt>Languages</dt><dd>TypeScript, JavaScript, Python, Swift</dd></div>
+      <div><dt>Web</dt><dd>Next.js, Supabase, Tailwind, Vercel</dd></div>
+      <div><dt>Graphics</dt><dd>Three.js, WebGL, GLSL, Web Audio</dd></div>
+      <div><dt>Backend</dt><dd>FastAPI, MCP servers, Google Workspace APIs</dd></div>
+    </dl>
+
+    <h3 class="info-head">Contact</h3>
+    <dl class="specs info-specs">
+      <div><dt>GitHub</dt><dd><a href="https://github.com/windowopner" target="_blank" rel="noopener">github.com/windowopner</a></dd></div>
     </dl>
   </dialog>
 
@@ -148,6 +174,6 @@
     </ul>
   </noscript>
 
-  <script type="module" src="app.js?v=202610150600"></script>
+  <script type="module" src="app.js?v=202610151200"></script>
 </body>
 </html>
