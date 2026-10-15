@@ -339,11 +339,11 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
   let grabT = 0;
 
   // Effects on the front disc. Each eases toward its target.
-  const fx = { hover: 0, hoverT: 0, flip: 0, flipT: 0, push: 0, pushT: 0, wobble: 0, press: 0, pressT: 0 };
+  const fx = { hover: 0, hoverT: 0, push: 0, pushT: 0, press: 0, pressT: 0 };
   let pushTimer = 0;
   const ease = (v, t, rate, dt) => v + (t - v) * (1 - Math.exp(-rate * dt));
 
-  function layout(dt = 0.016, time = 0) {
+  function layout(dt = 0.016) {
     for (const d of discs) {
       const { i, spin, shadow } = d.userData;
       const k = i - pos;                       // distance from the front, in discs
@@ -356,14 +356,13 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
       d.position.set(k * SPACING, -0.04 * k * k + (1 - e) * -1.4 + lift, z);
       const s = (1 - a * 0.3) * (0.82 + 0.18 * e);
       d.scale.setScalar(s);
-      // A24-style tilt: the disc leans back and turns toward the centre. A sealed disc
-      // flips over to show its data side; a refused code makes it shudder.
+      // A24-style tilt: the disc leans back and turns toward the centre.
       // Discs lean into the turn while the carousel moves, like they have weight.
       const lean = Math.max(-1, Math.min(1, speed / 6));
       d.rotation.set(
-        -0.62 + tilt.y * 0.16 + (1 - e) * -0.9 + (front ? fx.flip : 0) + Math.abs(lean) * 0.08,
+        -0.62 + tilt.y * 0.16 + (1 - e) * -0.9 + Math.abs(lean) * 0.08,
         -0.32 * Math.sign(k) * a + 0.18 + tilt.x * 0.22 - lean * 0.28,
-        0.06 + (front ? Math.sin(time * 0.03) * fx.wobble * 0.14 : 0) + lean * 0.1,
+        0.06 + lean * 0.1,
       );
       if (front && grabbed) {
         // Held: the disc turns only with your hand.
@@ -405,9 +404,7 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     tilt.x += (tilt.tx - tilt.x) * 0.06;
     tilt.y += (tilt.ty - tilt.y) * 0.06;
     fx.hover = ease(fx.hover, fx.hoverT, 8, dt);
-    fx.flip = ease(fx.flip, fx.flipT, 7, dt);
     fx.push = ease(fx.push, fx.pushT, 9, dt);
-    fx.wobble = ease(fx.wobble, 0, 3.5, dt);
     fx.press = ease(fx.press, fx.pressT, 12, dt);
     speed = ease(speed, dragging ? dragVel : vel, 10, dt);
     // A held disc stops when the hand stops, even though no move event says so.
@@ -424,7 +421,7 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     // The light sweeps across the mirror as the pointer moves, and drifts slowly on its own.
     if (!reduceMotion) envDrift += dt * 0.05;
     scene.environmentRotation.set(tilt.y * 0.35, tilt.x * 0.9 + envDrift, 0);
-    layout(dt, now);
+    layout(dt);
     renderer.render(scene, camera);
     onFrame?.(pos, speed, grabbed ? grabVel : null);
     frame = requestAnimationFrame(tick);
@@ -554,7 +551,7 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     canvas.style.cursor = "grabbing";
     clearTimeout(holdTimer);
     holdTimer = 0;
-    if (!reduceMotion && pick(e) === target && fx.flipT === 0) {
+    if (!reduceMotion && pick(e) === target) {
       // Hold still for a moment on the front disc and you've got it in your hand.
       holdTimer = setTimeout(() => {
         holdTimer = 0;
@@ -619,8 +616,7 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
     },
     setLabel: drawLabel,
     // Physical feedback on the front disc: "select" spins it up, "open" throws it toward
-    // you, "seal" flips it to the data side, "unseal" flips it back, "deny" shakes it,
-    // "unlock" flips back with a fast spin.
+    // you.
     pulse(kind) {
       if (reduceMotion) return;
       const d = discs[target];
@@ -631,10 +627,6 @@ export function create(canvas, { count, label, onSelect, onActivate, onFrame, on
         clearTimeout(pushTimer);
         pushTimer = setTimeout(() => { fx.pushT = 0; }, 420);
       }
-      if (kind === "seal") fx.flipT = Math.PI;
-      if (kind === "unseal") fx.flipT = 0;
-      if (kind === "deny") fx.wobble = 1;
-      if (kind === "unlock") { fx.flipT = 0; d.userData.spinV = 16; rippleT = 0; }
     },
     intro() { introPlaying = true; },
     setBeat(v) { beatT = v; },

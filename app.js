@@ -1,51 +1,40 @@
-// The archive: five discs, one in front. Every disc except Undertone is sealed: its title
-// and description are filler text drawn as a mosaic, so the real wording never ships in
-// the page source. Sealed discs carry no link at all; the real ones live encrypted in
-// locks.json and only appear after the keypad code decrypts them.
+// The archive: five discs, one in front.
 const DISCS = [
   {
-    title: "Velorum",
+    title: "StudyOS",
     kind: "Web app",
-    stack: "Next.js, Supabase, Tailwind",
-    text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut.",
+    stack: "Next.js 16, Supabase, Claude API",
+    text: "A whole school week in one app: assignments, notes, flashcards, to-dos, and an AI tutor that builds flashcard decks for you. Study rooms check passwords and roles inside the database, so the browser is never trusted.",
     url: null,
-    redacted: true,
-    locked: true,
   },
   {
     title: "Undertone",
     kind: "macOS app",
-    stack: "Swift",
-    text: "A desktop background that moves with whatever music is playing, built on system audio capture.",
+    stack: "Swift, Metal, Core Audio",
+    text: "A desktop wallpaper that listens. It taps system audio, splits it into bass, mids, highs, and beats with an FFT, and drives Metal shaders tinted by the album art of whatever is playing.",
     url: null,
   },
   {
-    title: "Arcus",
-    kind: "Website",
-    stack: "HTML, CSS, JavaScript",
-    text: "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi.",
-    url: null,
-    redacted: true,
-    locked: true,
+    title: "Folio",
+    kind: "Web platform",
+    stack: "JavaScript, Supabase",
+    text: "A publishing platform for essays, letters, and poems: @handles, follows, likes, comments, bookmarks, and version history, behind Google sign-in and row-level security.",
+    url: "https://project-km7wz.vercel.app",
   },
   {
-    title: "Tempor Incididunt U",
+    title: "Workspace Connector",
     kind: "MCP server",
     status: "archived",
-    stack: "Python, FastAPI",
-    text: "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est.",
+    stack: "Python, FastAPI, OAuth 2.1",
+    text: "A remote MCP server that let Claude work in my Google account: 12 tools across Classroom, Drive, Docs, and Slides. It is its own OAuth 2.1 server, with dynamic client registration, PKCE, and rotating refresh tokens.",
     url: null,
-    redacted: true,
-    locked: true,
   },
   {
-    title: "Magna Aliqua",
+    title: "WebGL Ripple",
     kind: "Experiment",
     stack: "Three.js, GLSL",
-    text: "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque lau.",
+    text: "Water you can touch. The 2D wave equation is solved on the GPU every frame, ping-ponging between 512×512 half-float textures, then turned into normals and lit in a shader.",
     url: null,
-    redacted: true,
-    locked: true,
   },
 ];
 
@@ -55,6 +44,7 @@ const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2, "0");
 const code = (i) => `DSC_${pad(i + 1)}`;
 const kindOf = (d) => (d.status ? `${d.kind}, ${d.status}` : d.kind);
+const accessOf = (d) => (d.url ? "Live" : d.status === "archived" ? "Archived" : "Private");
 
 let index = 0;
 let shownIndex = -1;
@@ -77,8 +67,8 @@ const indexButtons = DISCS.map((d, i) => {
 function refreshIndex() {
   indexButtons.forEach((btn, i) => {
     const d = DISCS[i];
-    btn.querySelector(".index-kind").textContent = d.redacted ? d.kind : `${d.title}, ${d.kind}`;
-    btn.setAttribute("aria-label", d.redacted ? `${code(i)}, sealed ${d.kind}` : `${code(i)}, ${d.title}`);
+    btn.querySelector(".index-kind").textContent = `${d.title}, ${d.kind}`;
+    btn.setAttribute("aria-label", `${code(i)}, ${d.title}`);
     btn.setAttribute("aria-current", i === index ? "true" : "false");
   });
 }
@@ -146,7 +136,7 @@ ringGroup.append(ringPath, ringText);
 dial.insertBefore(ringGroup, dialRing);
 
 function setRing(d, i) {
-  const words = ["SABU ARCHIVE", code(i), d.kind.toUpperCase(), d.locked ? "SEALED" : d.url ? "OPEN" : "PRIVATE", d.stack.toUpperCase()];
+  const words = ["SABU ARCHIVE", code(i), d.title.toUpperCase(), d.kind.toUpperCase(), accessOf(d).toUpperCase(), d.stack.toUpperCase()];
   // Repeated so the band runs most of the way round; whatever passes the end of the path isn't drawn.
   const band = words.join("   /   ");
   ringSpan.textContent = `${band}   /   ${band}   /   ${band}`;
@@ -278,55 +268,6 @@ const endScrub = () => {
 track.addEventListener("pointerup", endScrub);
 track.addEventListener("pointercancel", endScrub);
 
-// ── Mosaic: draw text, shrink it, scale it back up with hard edges ───
-function mosaic(el, text, block, singleLine) {
-  const cs = getComputedStyle(el);
-  const font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-  const size = parseFloat(cs.fontSize);
-  const lineHeight = parseFloat(cs.lineHeight) || size * 1.3;
-  const maxWidth = singleLine ? Infinity : el.clientWidth || 360;
-
-  const measure = document.createElement("canvas").getContext("2d");
-  measure.font = font;
-  const lines = [];
-  let line = "";
-  text.split(" ").forEach((word) => {
-    const next = line ? `${line} ${word}` : word;
-    if (measure.measureText(next).width > maxWidth && line) { lines.push(line); line = word; }
-    else line = next;
-  });
-  lines.push(line);
-
-  const w = Math.ceil(Math.max(...lines.map((l) => measure.measureText(l).width))) + 2;
-  const h = Math.ceil(lines.length * lineHeight);
-  const full = document.createElement("canvas");
-  full.width = w;
-  full.height = h;
-  const f = full.getContext("2d");
-  f.font = font;
-  f.fillStyle = cs.color;
-  f.textBaseline = "middle";
-  lines.forEach((l, k) => f.fillText(l, 0, k * lineHeight + lineHeight / 2));
-
-  const small = document.createElement("canvas");
-  small.width = Math.ceil(w / block);
-  small.height = Math.ceil(h / block);
-  const s = small.getContext("2d");
-  s.drawImage(full, 0, 0, small.width, small.height);
-  const img = s.getImageData(0, 0, small.width, small.height);
-  for (let i = 3; i < img.data.length; i += 4) img.data[i] = Math.min(255, img.data[i] * 2.4);
-  s.putImageData(img, 0, 0);
-
-  small.className = "mosaic";
-  small.style.width = `${small.width * block}px`;
-  small.style.height = `${small.height * block}px`;
-  small.setAttribute("aria-hidden", "true");
-  const label = document.createElement("span");
-  label.className = "sr-only";
-  label.textContent = "Sealed";
-  el.replaceChildren(small, label);
-}
-
 // ── Disc labels: ink printed on the mirrored face ────────────────────
 const INK = "#16181d";
 const ACCENT = "#e0442d";
@@ -366,18 +307,12 @@ function drawLabel(i, ctx, size) {
   ctx.font = `600 ${Math.round(size * 0.1)}px "Geist", ui-sans-serif, sans-serif`;
   ctx.fillText(code(i), 0, -R(0.6));
 
-  // Title below the hole, or a redaction bar
-  if (d.redacted) {
-    const w = Math.min(R(1.05), d.title.length * size * 0.026);
-    ctx.globalAlpha = 0.9;
-    ctx.fillRect(-w / 2, R(0.52), w, size * 0.05);
-  } else {
-    ctx.font = `500 ${Math.round(size * 0.058)}px "Geist", ui-sans-serif, sans-serif`;
-    ctx.fillText(d.title, 0, R(0.56));
-  }
+  // Title below the hole
+  ctx.font = `500 ${Math.round(size * 0.058)}px "Geist", ui-sans-serif, sans-serif`;
+  ctx.fillText(d.title, 0, R(0.56));
   ctx.globalAlpha = 0.7;
   ctx.font = `400 ${Math.round(size * 0.026)}px "Geist Mono", ui-monospace, monospace`;
-  ctx.fillText(d.locked ? "SEALED" : d.url ? "OPEN" : "PRIVATE", 0, R(0.71));
+  ctx.fillText(accessOf(d).toUpperCase(), 0, R(0.71));
 
   // One red index mark at twelve o'clock
   ctx.globalAlpha = 1;
@@ -405,14 +340,21 @@ function scramble(el, text) {
 
 // ── Reveal: the title rises letter by letter, the text darkens word by word ──
 function revealLetters(el, text) {
-  // Spaces stay plain text so long titles can still wrap between words.
-  el.replaceChildren(...[...text].map((ch, k) => {
-    if (ch === " ") return document.createTextNode(" ");
-    const span = document.createElement("span");
-    span.className = "ch";
-    span.style.setProperty("--i", k);
-    span.textContent = ch;
-    return span;
+  // Letters are grouped by word and spaces stay plain text, so long titles wrap between
+  // words and never inside one.
+  let k = 0;
+  el.replaceChildren(...text.split(" ").flatMap((w, n) => {
+    const word = document.createElement("span");
+    word.className = "word";
+    word.append(...[...w].map((ch) => {
+      const span = document.createElement("span");
+      span.className = "ch";
+      span.style.setProperty("--i", k++);
+      span.textContent = ch;
+      return span;
+    }));
+    k++;
+    return n ? [document.createTextNode(" "), word] : [word];
   }));
   el.setAttribute("aria-label", text);
 }
@@ -452,32 +394,22 @@ function select(i) {
   setBignum(index + 1);
 
   scramble($("code"), code(index));
-  if (d.redacted) {
-    mosaic($("title"), d.title, 7, true);
-    mosaic($("text"), d.text, 5, false);
-  } else {
-    revealLetters($("title"), d.title);
-    revealWords($("text"), d.text);
-  }
+  revealLetters($("title"), d.title);
+  revealWords($("text"), d.text);
   track.setAttribute("aria-valuenow", String(index + 1));
-  track.setAttribute("aria-valuetext", d.redacted ? `${code(index)}, sealed` : `${code(index)}, ${d.title}`);
+  track.setAttribute("aria-valuetext", `${code(index)}, ${d.title}`);
   trackSlots.forEach((li, k) => li.classList.toggle("on", k === index));
   $("kind").textContent = kindOf(d);
   $("stack").textContent = d.stack;
-  $("access").textContent = d.url ? "Open" : d.locked ? "Sealed, needs a code" : "Private";
+  $("access").textContent = d.url ? "Live" : d.status === "archived" ? "Archived, not deployed" : "Private for now";
 
-  action.classList.toggle("is-locked", Boolean(d.locked));
   if (d.url) {
     action.disabled = false;
     actionLabel.textContent = "Open project";
     action.setAttribute("aria-label", `Open ${d.title} in a new tab`);
-  } else if (d.locked) {
-    action.disabled = false;
-    actionLabel.textContent = "Enter code";
-    action.setAttribute("aria-label", `${code(index)} is sealed. Enter the code`);
   } else {
     action.disabled = true;
-    actionLabel.textContent = "Private for now";
+    actionLabel.textContent = d.status === "archived" ? "Archived" : "Private for now";
     action.removeAttribute("aria-label");
   }
 }
@@ -488,150 +420,12 @@ function activate() {
     // Open straight away (inside the click, so it isn't blocked); the disc flies out as it does.
     pulse("open");
     window.open(d.url, "_blank", "noopener");
-  } else if (d.locked) {
-    pulse("seal");
-    openPad();
   }
 }
 
 action.addEventListener("click", activate);
 $("prev").addEventListener("click", () => select(index - 1));
 $("next").addEventListener("click", () => select(index + 1));
-
-// ── Keypad. One code opens every sealed disc: locks.json holds their real title,
-//    text, and link, encrypted (PBKDF2-SHA256 + AES-GCM) by tools/lock.mjs. A wrong
-//    code simply fails to decrypt; nothing secret is in the page. ─────────
-const keypad = $("keypad");
-const okKey = keypad.querySelector('[data-k="OK"]');
-const MAX_CODE = 12;
-let entry = "";
-let locks = null;
-let busy = false;
-let failures = 0;
-let waitUntil = 0;
-
-fetch(`locks.json?v=${VERSION}`)
-  .then((r) => (r.ok ? r.json() : null))
-  .then((data) => { locks = data; showCode(); })
-  .catch(() => { locks = null; });
-
-function padStatus(left, right) {
-  $("pad-status").textContent = left;
-  $("pad-code").textContent = right;
-}
-
-function showCode() {
-  const shown = "*".repeat(Math.min(entry.length, 8)) + (entry.length > 8 ? "+" : "");
-  padStatus(locks ? "Code" : "Unavailable", entry ? shown.padEnd(8, "-") : "--------");
-  okKey.disabled = !locks || busy || entry.length < 4;
-}
-
-function openPad() {
-  entry = "";
-  showCode();
-  keypad.showModal();
-  muffleCheck();
-}
-
-function closePad() {
-  if (keypad.open) keypad.close();
-}
-
-const b64 = (s) => Uint8Array.from(atob(s), (ch) => ch.charCodeAt(0));
-async function decrypt(pin) {
-  const { subtle } = crypto;
-  const base = await subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveKey"]);
-  const key = await subtle.deriveKey(
-    { name: "PBKDF2", hash: "SHA-256", salt: b64(locks.salt), iterations: locks.iterations },
-    base,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["decrypt"],
-  );
-  const plain = await subtle.decrypt({ name: "AES-GCM", iv: b64(locks.iv) }, key, b64(locks.data));
-  return JSON.parse(new TextDecoder().decode(plain));
-}
-
-function applyUnlock(payload) {
-  Object.entries(payload).forEach(([k, real]) => {
-    const i = Number(k);
-    if (!DISCS[i]) return;
-    DISCS[i] = { ...DISCS[i], ...real, redacted: false, locked: false };
-    scene?.setLabel(i);
-  });
-  if (info.open) fillInfo();
-}
-
-async function submitCode() {
-  if (!locks || busy || entry.length < 4) return;
-  const now = Date.now();
-  if (now < waitUntil) {
-    padStatus("Wait", `${Math.ceil((waitUntil - now) / 1000)}s`.padStart(8, " "));
-    return;
-  }
-  busy = true;
-  showCode();
-  let dots = 0;
-  const reading = setInterval(() => padStatus("Reading", ".".repeat((dots++ % 3) + 1).padEnd(8, " ")), 160);
-  try {
-    const payload = await decrypt(entry);
-    clearInterval(reading);
-    try { sessionStorage.setItem("unlocked-v2", JSON.stringify(payload)); } catch (err) { /* storage blocked */ }
-    padStatus("Open", "      ok");
-    failures = 0;
-    setTimeout(() => {
-      busy = false;
-      closePad();
-      applyUnlock(payload);
-      select(index);
-      pulse("unlock");
-    }, 420);
-  } catch (err) {
-    clearInterval(reading);
-    busy = false;
-    failures++;
-    // Back off after a few misses: 1s, 2s, 4s, ... up to 30s.
-    if (failures >= 3) waitUntil = Date.now() + Math.min(30000, 1000 * 2 ** (failures - 3));
-    entry = "";
-    padStatus("Wrong", "    code");
-    pulse("deny");
-    keypad.classList.remove("shake");
-    void keypad.offsetWidth;
-    keypad.classList.add("shake");
-    setTimeout(showCode, 900);
-  }
-}
-
-function pressPad(k) {
-  if (busy) return;
-  if (k === "OK") { submitCode(); return; }
-  sound?.cue("key", k);
-  if (k === "C") entry = "";
-  else if (/^\d$/.test(k) && entry.length < MAX_CODE) entry += k;
-  showCode();
-}
-
-function flashKey(k) {
-  const key = keypad.querySelector(`[data-k="${k}"]`);
-  if (!key) return;
-  key.classList.add("pressed");
-  setTimeout(() => key.classList.remove("pressed"), 120);
-}
-
-$("pad-grid").addEventListener("click", (e) => {
-  const key = e.target.closest(".pad-key");
-  if (key && !key.disabled) pressPad(key.dataset.k);
-});
-$("keypad-close").addEventListener("click", closePad);
-// Whichever way the keypad closes (button, Escape, backdrop, unlock), the disc flips back.
-keypad.addEventListener("close", () => { scene?.pulse("unseal"); muffleCheck(); });
-keypad.addEventListener("click", (e) => { if (e.target === keypad) closePad(); });
-
-// Already unlocked earlier in this tab: restore quietly.
-try {
-  const saved = sessionStorage.getItem("unlocked-v2");
-  if (saved) applyUnlock(JSON.parse(saved));
-} catch (err) { /* storage blocked or bad data */ }
 
 // ── Info panel ───────────────────────────────────────────────────────
 const info = $("info");
@@ -642,8 +436,7 @@ function fillInfo() {
     c.className = "info-code";
     c.textContent = code(i);
     const name = document.createElement("span");
-    name.textContent = d.redacted ? "Sealed" : d.title;
-    if (d.redacted) name.className = "info-sealed";
+    name.textContent = d.title;
     const kind = document.createElement("span");
     kind.className = "info-kind";
     kind.textContent = d.kind;
@@ -663,12 +456,6 @@ $("year").textContent = new Date().getFullYear();
 // ── Keyboard: arrows step, number keys jump, Enter opens ─────────────
 window.addEventListener("keydown", (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
-  if (keypad.open) {
-    if (/^\d$/.test(e.key)) { pressPad(e.key); flashKey(e.key); return; }
-    if (e.key === "Backspace") { entry = entry.slice(0, -1); showCode(); return; }
-    if (e.key === "Enter") { e.preventDefault(); pressPad("OK"); flashKey("OK"); }
-    return;
-  }
   if (info.open || document.documentElement.classList.contains("opening")) return;
   if (e.key === "m" || e.key === "M") { toggleSound(); return; }
   if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); select(index + 1); }
@@ -688,7 +475,7 @@ let wheelPeak = 0;
 let wheelTrough = 0;
 let wheelIdle = 0;
 window.addEventListener("wheel", (e) => {
-  if (!fixedLayout.matches || keypad.open || info.open) return;
+  if (!fixedLayout.matches || info.open) return;
   e.preventDefault();
   const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
   const size = Math.abs(delta);
@@ -733,7 +520,7 @@ function onLevel(level, bars) {
 }
 
 function muffleCheck() {
-  sound?.muffle(keypad.open || info.open);
+  sound?.muffle(info.open);
 }
 
 // Runs inside a click or key press: the AudioContext has to be made and resumed right here.

@@ -2,7 +2,7 @@
 // and moving the carousel is the crossfader. Drag between discs and the two loops blend
 // while the filter closes; hold the front disc and the music follows your hand, stopping
 // when you hold still and scratching when you turn it. Small synthesised cues answer the
-// notches, the keypad, and the lock.
+// notches, opening a project, and grabbing a disc.
 //
 // createSound(ctx, { first, onLevel }) -> Promise<engine>, resolved once the first loop
 // is ready. The AudioContext is made by the caller inside a click, so the browser lets
@@ -11,7 +11,7 @@
 //   engine.mix(pos, speed)    carousel position (which loops) and speed (how muffled)
 //   engine.grip(v)            hand speed on the held disc in rad/s, or null when let go
 //   engine.muffle(on)         a dialog is open: the music goes behind glass
-//   engine.cue(kind, arg)     tick, key, seal, deny, unlock, open, grab
+//   engine.cue(kind, arg)     tick, open, grab
 
 const V = new URL(import.meta.url).searchParams.get("v") || "";
 // A hand turning the disc at this speed (rad/s) plays the loop at its normal speed.
@@ -190,29 +190,6 @@ export async function createSound(ctx, { first = 0, onLevel } = {}) {
       const t = now();
       blip(t, hz(PENTA[5 + (i % 5)]), { type: "triangle", dur: 0.04, v: 0.05 });
       hiss(t, { from: 7000, dur: 0.012, v: 0.05, type: "highpass" });
-    },
-    key(k) {
-      const t = now();
-      if (k === "C") { blip(t, 330, { type: "square", to: 220, dur: 0.08, v: 0.04, cutoff: 1600 }); return; }
-      const n = PENTA[Number(k) % PENTA.length];
-      blip(t, hz(n), { type: "square", dur: 0.07, v: 0.04, cutoff: 2600 });
-      blip(t, hz(n + 12), { dur: 0.05, v: 0.02 });
-    },
-    seal() {
-      const t = now();
-      blip(t, 540, { to: 110, dur: 0.3, v: 0.11 });
-      hiss(t, { from: 3200, to: 380, dur: 0.32, v: 0.05 });
-    },
-    deny() {
-      const t = now();
-      blip(t, 220, { type: "sawtooth", to: 200, dur: 0.12, v: 0.06, cutoff: 1300, pan: -0.2 });
-      blip(t + 0.13, 165, { type: "sawtooth", to: 140, dur: 0.22, v: 0.06, cutoff: 1100, pan: 0.2 });
-    },
-    unlock() {
-      const t = now();
-      [69, 72, 76, 81, 84, 88].forEach((n, k) => blip(t + k * S16 / 2, hz(n), { type: "triangle", dur: 0.3, v: 0.05, pan: k % 2 ? 0.35 : -0.35 }));
-      hiss(t, { from: 700, to: 9000, dur: 0.5, v: 0.05, type: "highpass" });
-      blip(t + 0.38, 150, { to: 44, dur: 0.45, v: 0.32 });
     },
     open() {
       const t = now();
