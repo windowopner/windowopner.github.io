@@ -1,4 +1,4 @@
-// The five loops, one per disc, synthesised offline into plain sample arrays. They share a
+// The six loops, one per disc, synthesised offline into plain sample arrays. They share a
 // tempo, a length, and (loosely) A minor, so the deck can crossfade between neighbours in
 // the middle of a bar and it still sounds like a mix.
 //
@@ -7,6 +7,7 @@
 //   03  minimal techno   rolling sixteenth bass, rim and hats
 //   04  dub techno       one chord stab through a long delay, vinyl dust
 //   05  IDM              broken kick, FM droplets in euclidean rhythms
+//   06  acid techno      a squelching 303-style line, its filter rising and falling
 //
 // render(i, sampleRate) -> Promise<[Float32Array, Float32Array]>, exactly one loop long.
 
@@ -262,7 +263,7 @@ function sub(st, t, m, dur, v = 0.32) {
   voice(st, t, hz(m), dur, { wave: "sine", cutoff: 400, attack: 0.008, release: 0.08, v });
 }
 
-// ── The five loops ───────────────────────────────────────────────────
+// ── The six loops ────────────────────────────────────────────────────
 const tracks = [
   // 01 deep house: four to the floor, offbeat bass, warm ninth chords.
   (st) => {
@@ -378,11 +379,36 @@ const tracks = [
     for (const s of [0, 32]) sub(st, at(s), 33, at(12), 0.26);
     for (const s of [20, 52]) sub(st, at(s), 29 + (s > 32 ? 0 : 4), at(8), 0.2);
   },
+
+  // 06 acid techno: a resonant saw line with accents, its filter opening over two bars and
+  // closing over the next two, under a driving kick.
+  (st) => {
+    for (const [s, v] of hits("x...x...x...x...")) kick(st, at(s), v, { punch: 170, tone: 51, decay: 0.34 });
+    for (let s = 0; s < STEPS + 16; s += 4) duck(st, at(s), 0.6);
+    for (const [s, v] of hits("....x.......x...")) clap(st, at(s), v * 0.85, 0.35);
+    for (const [s, v] of hits("..x...x...x...x.")) hat(st, at(s), v, true, 0.15);
+    for (const [s, v] of hits("xoxoxoxoXoxoxoxo")) hat(st, at(s), v * 0.7, false, -0.12);
+    const line = [45, 45, 57, 45, 48, 45, 52, 55, 45, 57, 45, 43, 45, 60, 57, 48];
+    const accent = "X..x..X...x.X..x";
+    const rest = "...........-...-";
+    const shift = [0, 0, 3, -2];
+    for (let s = 0; s < STEPS; s++) {
+      if (rest[s % 16] === "-") continue;
+      const acc = accent[s % 16] !== ".";
+      const open = 0.5 - 0.5 * Math.cos((s / STEPS) * Math.PI * 2);
+      voice(st, at(s), hz(line[s % 16] + shift[Math.floor(s / 16)]), S16 * 0.85, {
+        cutoff: 320 + open * 1700 + (acc ? 350 : 0), env: acc ? 4.5 : 2.8, fdecay: acc ? 0.09 : 0.05, q: 12,
+        v: acc ? 0.12 : 0.085, release: 0.03, dly: s % 16 === 13 ? 0.45 : 0.06, rev: 0.05,
+      });
+    }
+    for (const [s] of hits("..x...x...x...x.")) sub(st, at(s), 33 + shift[Math.floor(s / 16)], S16 * 1.5, 0.14);
+    for (const s of [14, 46]) pad(st, at(s), [57, 60, 64], S16 * 0.6, { cutoff: 2200, v: 0.05, attack: 0.003, release: 0.12, rev: 0.3, dly: 0.8 });
+  },
 ];
 
 export const COUNT = tracks.length;
 
-// All five come out at about the same loudness, so a crossfade never jumps in level.
+// All six come out at about the same loudness, so a crossfade never jumps in level.
 const TARGET_RMS = 0.15;
 
 export async function render(i, sampleRate) {

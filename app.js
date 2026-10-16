@@ -1,4 +1,4 @@
-// The archive: five discs, one in front.
+// The archive: six discs, one in front.
 const DISCS = [
   {
     title: "StudyOS",
@@ -36,6 +36,14 @@ const DISCS = [
     text: "Water you can touch. The 2D wave equation is solved on the GPU every frame, ping-ponging between 512×512 half-float textures, then turned into normals and lit in a shader.",
     url: null,
   },
+  {
+    title: "pumpfun-sim",
+    kind: "Research tool",
+    status: "source",
+    stack: "Python, Solana, SQLite, Streamlit",
+    text: "Do memecoin sniping bots make money? It records every Pump.fun launch and trade on Solana, reproduces 2.3 million real trades to the lamport, and backtests strategies against a random baseline. Buying at launch loses, even before fees.",
+    url: "https://github.com/windowopner/pumpfun-sim",
+  },
 ];
 
 const VERSION = new URL(import.meta.url).searchParams.get("v") || "";
@@ -43,8 +51,9 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matc
 const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2, "0");
 const code = (i) => `DSC_${pad(i + 1)}`;
-const kindOf = (d) => (d.status ? `${d.kind}, ${d.status}` : d.kind);
-const accessOf = (d) => (d.url ? "Live" : d.status === "archived" ? "Archived" : "Private");
+// "source": the url is the code, not a running site.
+const kindOf = (d) => (d.status && d.status !== "source" ? `${d.kind}, ${d.status}` : d.kind);
+const accessOf = (d) => (d.url ? (d.status === "source" ? "Source" : "Live") : d.status === "archived" ? "Archived" : "Private");
 
 let index = 0;
 let shownIndex = -1;
@@ -401,12 +410,13 @@ function select(i) {
   trackSlots.forEach((li, k) => li.classList.toggle("on", k === index));
   $("kind").textContent = kindOf(d);
   $("stack").textContent = d.stack;
-  $("access").textContent = d.url ? "Live" : d.status === "archived" ? "Archived, not deployed" : "Private for now";
+  const source = d.status === "source";
+  $("access").textContent = d.url ? (source ? "Open source" : "Live") : d.status === "archived" ? "Archived, not deployed" : "Private for now";
 
   if (d.url) {
     action.disabled = false;
-    actionLabel.textContent = "Open project";
-    action.setAttribute("aria-label", `Open ${d.title} in a new tab`);
+    actionLabel.textContent = source ? "View source" : "Open project";
+    action.setAttribute("aria-label", source ? `View the source of ${d.title} in a new tab` : `Open ${d.title} in a new tab`);
   } else {
     action.disabled = true;
     actionLabel.textContent = d.status === "archived" ? "Archived" : "Private for now";
