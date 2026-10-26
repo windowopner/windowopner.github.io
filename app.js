@@ -3,7 +3,7 @@ const DISCS = [
   {
     title: "StudyOS",
     kind: "Web app",
-    stack: "Next.js 16, Supabase, Claude API",
+    stack: "Next.js 16, Supabase, PostgreSQL, Claude API",
     text: "A whole school week in one app: assignments, notes, flashcards, to-dos, and an AI tutor that builds flashcard decks for you. Study rooms check passwords and roles inside the database, so the browser is never trusted.",
     url: null,
   },
@@ -17,7 +17,7 @@ const DISCS = [
   {
     title: "Folio",
     kind: "Web platform",
-    stack: "JavaScript, Supabase",
+    stack: "JavaScript, Supabase, PostgreSQL",
     text: "A publishing platform for essays, letters, and poems: @handles, follows, likes, comments, bookmarks, and version history, behind Google sign-in and row-level security.",
     url: "https://project-km7wz.vercel.app",
   },
@@ -25,7 +25,7 @@ const DISCS = [
     title: "Workspace Connector",
     kind: "MCP server",
     status: "archived",
-    stack: "Python, FastAPI, OAuth 2.1",
+    stack: "Python, FastAPI, MCP, OAuth 2.1",
     text: "A remote MCP server that let Claude work in my Google account: 12 tools across Classroom, Drive, Docs, and Slides. It is its own OAuth 2.1 server, with dynamic client registration, PKCE, and rotating refresh tokens.",
     url: null,
   },
