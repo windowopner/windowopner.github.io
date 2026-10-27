@@ -10,8 +10,8 @@ const DISCS = [
   {
     title: "Undertone",
     kind: "macOS app",
-    stack: "Swift, Metal, Core Audio",
-    text: "A desktop wallpaper that listens. It taps system audio, splits it into bass, mids, highs, and beats with an FFT, and drives Metal shaders tinted by the album art of whatever is playing.",
+    stack: "Swift, ScreenCaptureKit, SceneKit",
+    text: "A desktop wallpaper that listens. It captures system audio with ScreenCaptureKit, splits it into 16 bands with a bank of band-pass filters, tracks the beat, and drives nine visual styles in SwiftUI and SceneKit, tinted by the album art of whatever is playing.",
     url: null,
   },
   {
@@ -37,12 +37,12 @@ const DISCS = [
     url: null,
   },
   {
-    title: "pumpfun-sim",
+    title: "pumpfun-trial-1",
     kind: "Research tool",
     status: "source",
     stack: "Python, Solana, SQLite, Streamlit",
     text: "Do memecoin sniping bots make money? It records every Pump.fun launch and trade on Solana, reproduces 2.3 million real trades to the lamport, and backtests strategies against a random baseline. Buying at launch loses, even before fees.",
-    url: "https://github.com/windowopner/pumpfun-sim",
+    url: "https://github.com/windowopner/pumpfun-trial-1",
   },
 ];
 
