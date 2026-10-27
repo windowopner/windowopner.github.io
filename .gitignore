@@ -1,3 +1,4 @@
 .DS_Store
 # Plain-text disc contents for the lock. Never commit this.
 private/
+.claude/
