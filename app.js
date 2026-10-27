@@ -3,16 +3,18 @@ const DISCS = [
   {
     title: "StudyOS",
     kind: "Web app",
+    status: "source",
     stack: "Next.js 16, Supabase, Claude API",
     text: "A whole school week in one app: assignments, notes, flashcards, to-dos, and an AI tutor that builds flashcard decks for you. Study rooms check passwords and roles inside the database, so the browser is never trusted.",
-    url: null,
+    url: "https://github.com/windowopner/studyos",
   },
   {
     title: "Undertone",
     kind: "macOS app",
+    status: "source",
     stack: "Swift, ScreenCaptureKit, SceneKit",
     text: "A desktop wallpaper that listens. It captures system audio with ScreenCaptureKit, splits it into 16 bands with a bank of band-pass filters, tracks the beat, and drives nine visual styles in SwiftUI and SceneKit, tinted by the album art of whatever is playing.",
-    url: null,
+    url: "https://github.com/windowopner/undertone",
   },
   {
     title: "Folio",
@@ -27,7 +29,7 @@ const DISCS = [
     status: "archived",
     stack: "Python, FastAPI, OAuth 2.1",
     text: "A remote MCP server that let Claude work in my Google account: 12 tools across Classroom, Drive, Docs, and Slides. It is its own OAuth 2.1 server, with dynamic client registration, PKCE, and rotating refresh tokens.",
-    url: null,
+    url: "https://github.com/windowopner/MCP-test",
   },
   {
     title: "WebGL Ripple",
@@ -51,9 +53,10 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matc
 const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2, "0");
 const code = (i) => `DSC_${pad(i + 1)}`;
-// "source": the url is the code, not a running site.
+// "source": the url is the code, not a running site. An archived disc with a url links to its code too.
+const isSource = (d) => d.status === "source" || (d.status === "archived" && Boolean(d.url));
 const kindOf = (d) => (d.status && d.status !== "source" ? `${d.kind}, ${d.status}` : d.kind);
-const accessOf = (d) => (d.url ? (d.status === "source" ? "Source" : "Live") : d.status === "archived" ? "Archived" : "Private");
+const accessOf = (d) => (d.url ? (isSource(d) ? "Source" : "Live") : d.status === "archived" ? "Archived" : "Private");
 
 let index = 0;
 let shownIndex = -1;
@@ -410,8 +413,8 @@ function select(i) {
   trackSlots.forEach((li, k) => li.classList.toggle("on", k === index));
   $("kind").textContent = kindOf(d);
   $("stack").textContent = d.stack;
-  const source = d.status === "source";
-  $("access").textContent = d.url ? (source ? "Open source" : "Live") : d.status === "archived" ? "Archived, not deployed" : "Private for now";
+  const source = isSource(d);
+  $("access").textContent = d.url ? (source ? (d.status === "archived" ? "Archived, open source" : "Open source") : "Live") : d.status === "archived" ? "Archived, not deployed" : "Private for now";
 
   if (d.url) {
     action.disabled = false;

@@ -2,7 +2,7 @@
 
 My portfolio, served by GitHub Pages at https://windowopner.github.io.
 
-Five projects kept as an archive of discs: StudyOS, Undertone, Folio, Workspace Connector, and WebGL Ripple. One disc sits in front inside a dial of tick marks; scroll, drag the disc, use the arrow keys, press a number, or tap a code to change it.
+Six projects kept as an archive of discs: StudyOS, Undertone, Folio, Workspace Connector, WebGL Ripple, and pumpfun-trial-1. One disc sits in front inside a dial of tick marks; scroll, drag the disc, use the arrow keys, press a number, or tap a code to change it.
 
 The discs are real-time 3D (Three.js 0.170 from jsDelivr): a mirrored data layer with a thin-film iridescent sheen whose thickness varies around the disc, so the rainbow turns as it spins, a clear hub, and a label printed in ink. Reflections come from a small studio of softboxes and black flags baked into an environment map. Without WebGL a flat disc stands in.
 
@@ -24,7 +24,7 @@ Plain HTML, CSS, and JavaScript modules with no build step.
 - `style.css`: layout and type. Cool off-white, ink hairlines, one red accent, square corners.
 - `favicon.svg`, `apple-touch-icon.png`, `og.png`: icon and link preview.
 
-To add or swap a project, edit `DISCS` in `app.js`: title, kind, stack, a one- or two-sentence description, an optional `status` (`"archived"`, or `"source"` when the `url` is a code repository rather than a running site), and a `url` when there is something to open. A new disc also needs a loop of its own in `tracks.js`. The disc label, the index, About, and the ring text are all drawn from the same entry. Update the `<noscript>` list in `index.html` to match.
+To add or swap a project, edit `DISCS` in `app.js`: title, kind, stack, a one- or two-sentence description, an optional `status` (`"archived"`, or `"source"` when the `url` is a code repository rather than a running site; an archived disc with a `url` links to its code), and a `url` when there is something to open. A new disc also needs a loop of its own in `tracks.js`. The disc label, the index, About, and the ring text are all drawn from the same entry. Update the `<noscript>` list in `index.html` to match.
 
 `og.png` is a 1200x630 capture of the page with disc 01 in front; retake it when the first disc changes.
 
